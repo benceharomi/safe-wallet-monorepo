@@ -1,4 +1,4 @@
-import type { NamedAddress } from '@/components/new-safe/create/types'
+import type { EmailOwner, NamedAddress } from '@/components/new-safe/create/types'
 import EthHashInfo from '@/components/common/EthHashInfo'
 import { safeCreationDispatch, SafeCreationEvent } from '@/features/counterfactual/services/safeCreationEvents'
 import NetworkLogosList from '@/features/multichain/components/NetworkLogosList'
@@ -58,6 +58,7 @@ import { FEATURES, hasFeature } from '@safe-global/utils/utils/chains'
 import { PayMethod } from '@safe-global/utils/features/counterfactual/types'
 import { type TransactionOptions } from '@safe-global/types-kit'
 import { getTotalFeeFormatted } from '@safe-global/utils/hooks/useDefaultGasPrice'
+import { SNS_BACKEND_URL } from '../../../../../config/constants'
 
 export const NetworkFee = ({
   totalFee,
@@ -84,14 +85,22 @@ export const NetworkFee = ({
 export const SafeSetupOverview = ({
   name,
   owners,
+  emailOwners = [], // Add emailOwners parameter with default empty array
   threshold,
   networks,
 }: {
   name?: string
   owners: NamedAddress[]
+  emailOwners?: EmailOwner[] // Add this type
   threshold: number
   networks: Chain[]
 }) => {
+  // Only include email owners that have an address (deployed)
+  const deployedEmailOwners = emailOwners.filter((owner) => !!owner?.address)
+
+  // Calculate total number of signers
+  const totalSignerCount = owners.length + deployedEmailOwners.length
+
   return (
     <Grid container spacing={3}>
       <ReviewRow
@@ -130,6 +139,7 @@ export const SafeSetupOverview = ({
         name="Signers"
         value={
           <Box data-testid="review-step-owner-info" className={css.ownersArray}>
+            {/* Display regular owners */}
             {owners.map((owner, index) => (
               <EthHashInfo
                 address={owner.address}
@@ -139,7 +149,21 @@ export const SafeSetupOverview = ({
                 showName
                 hasExplorer
                 showCopyButton
-                key={index}
+                key={`owner-${index}`}
+              />
+            ))}
+
+            {/* Display deployed email owners */}
+            {deployedEmailOwners.map((owner, index) => (
+              <EthHashInfo
+                address={owner.address}
+                name={owner.email || 'Email signer'}
+                shortAddress={false}
+                showPrefix={false}
+                showName
+                hasExplorer
+                showCopyButton
+                key={`email-${index}`}
               />
             ))}
           </Box>
@@ -149,7 +173,7 @@ export const SafeSetupOverview = ({
         name="Threshold"
         value={
           <Typography data-testid="review-step-threshold">
-            {threshold} out of {owners.length} {owners.length > 1 ? 'signers' : 'signer'}
+            {threshold} out of {totalSignerCount} {totalSignerCount > 1 ? 'signers' : 'signer'}
           </Typography>
         }
       />
@@ -166,7 +190,7 @@ const ReviewStep = ({ data, onSubmit, onBack, setStep }: StepRenderProps<NewSafe
   const router = useRouter()
   const [gasPrice] = useGasPrice()
   const customRpc = useAppSelector(selectRpc)
-  const [payMethod, setPayMethod] = useState(PayMethod.PayLater)
+  const [payMethod, setPayMethod] = useState(PayMethod.PayNow)
   const [executionMethod, setExecutionMethod] = useState(ExecutionMethod.RELAY)
   const [isCreating, setIsCreating] = useState<boolean>(false)
   const [submitError, setSubmitError] = useState<string>()
@@ -188,14 +212,19 @@ const ReviewStep = ({ data, onSubmit, onBack, setStep }: StepRenderProps<NewSafe
         ? createNewUndeployedSafeWithoutSalt(
             data.safeVersion,
             {
-              owners: data.owners.map((owner) => owner.address),
+              owners: [
+                ...data.owners.map((owner) => owner.address),
+                ...(data.emailOwners ?? [])
+                  .filter((emailOwner) => emailOwner.address)
+                  .map((emailOwner) => emailOwner.address),
+              ],
               threshold: data.threshold,
               paymentReceiver: data.paymentReceiver,
             },
             chain,
           )
         : undefined,
-    [chain, data.owners, data.safeVersion, data.threshold, data.paymentReceiver],
+    [chain, data.safeVersion, data.owners, data.emailOwners, data.threshold, data.paymentReceiver],
   )
 
   const safePropsForGasEstimation = useMemo(() => {
@@ -248,6 +277,25 @@ const ReviewStep = ({ data, onSubmit, onBack, setStep }: StepRenderProps<NewSafe
 
       for (const network of data.networks) {
         await createSafe(network, replayedSafeWithNonce, safeAddress)
+
+        if (data.emailOwners && data.emailOwners?.length > 0) {
+          for (const emailOwner of data.emailOwners) {
+            const accountResponse = await fetch(`${SNS_BACKEND_URL}/api/accounts/register`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                email: emailOwner.email,
+                accountCode: emailOwner.accountCode,
+                chainId: Number(network.chainId),
+                safeAddress,
+              }),
+            })
+
+            if (!accountResponse.ok) {
+              throw new Error('Error registering account')
+            }
+          }
+        }
       }
 
       // Update addressbook with owners and Safe on all chosen networks
@@ -382,7 +430,13 @@ const ReviewStep = ({ data, onSubmit, onBack, setStep }: StepRenderProps<NewSafe
   return (
     <>
       <Box data-testid="safe-setup-overview" className={layoutCss.row}>
-        <SafeSetupOverview name={data.name} owners={data.owners} threshold={data.threshold} networks={data.networks} />
+        <SafeSetupOverview
+          name={data.name}
+          owners={data.owners}
+          emailOwners={data.emailOwners} // Pass emailOwners to the component
+          threshold={data.threshold}
+          networks={data.networks}
+        />
       </Box>
       {isCounterfactualEnabled && (
         <>
@@ -391,7 +445,6 @@ const ReviewStep = ({ data, onSubmit, onBack, setStep }: StepRenderProps<NewSafe
             <PayNowPayLater
               totalFee={totalFee}
               isMultiChain={isMultiChainDeployment}
-              canRelay={canRelay}
               payMethod={payMethod}
               setPayMethod={setPayMethod}
             />

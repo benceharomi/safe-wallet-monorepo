@@ -217,10 +217,7 @@ const UndeployedNetworks = ({
     [allCompatibleChains, deployedChains],
   )
 
-  const [testNets, prodNets] = useMemo(
-    () => partition(availableNetworks, (config) => config.isTestnet),
-    [availableNetworks],
-  )
+  const [testNets] = useMemo(() => partition(availableNetworks, (config) => config.isTestnet), [availableNetworks])
 
   const noAvailableNetworks = useMemo(() => availableNetworks.every((config) => !config.available), [availableNetworks])
 
@@ -328,7 +325,7 @@ const UndeployedNetworks = ({
           </Box>
         ) : (
           <>
-            {prodNets.map((chain) => (
+            {availableNetworks.map((chain) => (
               <UndeployedNetworkMenuItem chain={chain} onSelect={onSelect} key={chain.chainId} />
             ))}
             {testNets.length > 0 && <TestnetDivider />}
@@ -388,14 +385,16 @@ const NetworkSelector = ({
     ])
   }, [chainId, configs, isSafeOpened, safeAddress, safesGrouped.allMultiChainSafes])
 
-  const [testNets, prodNets] = useMemo(
-    () =>
-      partition(
-        configs.filter((config) => availableChainIds.includes(config.chainId)),
-        (config) => config.isTestnet,
-      ),
-    [availableChainIds, configs],
+  const availableNetworks = useMemo(
+    () => configs.filter((config) => availableChainIds.includes(config.chainId)),
+    [configs, availableChainIds],
   )
+
+  const [testNets] = useMemo(() => partition(availableNetworks, (config) => config.isTestnet), [availableNetworks])
+
+  const filteredChains = useMemo(() => {
+    return chains.data.filter((chain) => chain.chainId === '11155111') // Only show Sepolia
+  }, [chains.data])
 
   const renderMenuItem = useCallback(
     (chainId: string, isSelected: boolean) => {
@@ -442,12 +441,12 @@ const NetworkSelector = ({
       open={open}
       onClose={handleClose}
       onOpen={handleOpen}
-      value={chainId}
+      value={currentChain?.chainId}
       size="small"
       className={css.select}
       variant="standard"
       IconComponent={ExpandMoreIcon}
-      renderValue={(value) => renderMenuItem(value, true)}
+      renderValue={(value) => renderMenuItem(value, value === currentChain?.chainId)}
       MenuProps={{
         transitionDuration: 0,
         sx: {
@@ -470,7 +469,7 @@ const NetworkSelector = ({
         },
       }}
     >
-      {prodNets.map((chain) => renderMenuItem(chain.chainId, false))}
+      {filteredChains.map((chain) => renderMenuItem(chain.chainId, chain.chainId === currentChain?.chainId))}
 
       {testNets.length > 0 && <TestnetDivider />}
 

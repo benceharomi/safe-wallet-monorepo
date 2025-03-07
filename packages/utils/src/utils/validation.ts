@@ -103,3 +103,11 @@ export const isValidURL = (url: string, protocolsAllowed = ['https:']): boolean 
     return false
   }
 }
+
+export const validateEmailAddress = (email: string): string | undefined => {
+  const EMAIL_RE = /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i
+
+  if (!EMAIL_RE.test(email)) {
+    return 'Invalid email address'
+  }
+}

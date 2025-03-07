@@ -3,7 +3,7 @@ import { useRouter } from 'next/router'
 
 import useWallet from '@/hooks/wallets/useWallet'
 import OverviewWidget from '@/components/new-safe/create/OverviewWidget'
-import type { NamedAddress } from '@/components/new-safe/create/types'
+import type { NamedAddress, EmailOwner } from '@/components/new-safe/create/types'
 import type { TxStepperProps } from '@/components/new-safe/CardStepper/useCardStepper'
 import SetNameStep from '@/components/new-safe/create/steps/SetNameStep'
 import OwnerPolicyStep from '@/components/new-safe/create/steps/OwnerPolicyStep'
@@ -28,6 +28,7 @@ export type NewSafeFormData = {
   networks: Chain[]
   threshold: number
   owners: NamedAddress[]
+  emailOwners?: EmailOwner[]
   saltNonce?: number
   safeVersion: SafeVersion
   safeAddress?: string
@@ -115,7 +116,7 @@ const CreateSafe = () => {
   const CreateSafeSteps: TxStepperProps<NewSafeFormData>['steps'] = [
     {
       title: 'Set up the basics',
-      subtitle: 'Give a name to your account and select which networks to deploy it on.',
+      subtitle: 'Give a name to your account.',
       render: (data, onSubmit, onBack, setStep) => (
         <SetNameStep
           setOverviewNetworks={setOverviewNetworks}

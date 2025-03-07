@@ -19,13 +19,11 @@ import { PayMethod } from '@safe-global/utils/features/counterfactual/types'
 
 const PayNowPayLater = ({
   totalFee,
-  canRelay,
   isMultiChain,
   payMethod,
   setPayMethod,
 }: {
   totalFee: string
-  canRelay: boolean
   isMultiChain: boolean
   payMethod: PayMethod
   setPayMethod: Dispatch<SetStateAction<PayMethod>>
@@ -64,16 +62,6 @@ const PayNowPayLater = ({
           </ListItemIcon>
           <Typography variant="body2">There will be a one-time activation fee</Typography>
         </ListItem>
-        {!isMultiChain && (
-          <ListItem disableGutters>
-            <ListItemIcon className={css.listItem}>
-              <CheckRoundedIcon fontSize="small" color="inherit" />
-            </ListItemIcon>
-            <Typography variant="body2">
-              If you choose to pay later, the fee will be included with the first transaction you make.
-            </Typography>
-          </ListItem>
-        )}
         <ListItem disableGutters>
           <ListItemIcon className={css.listItem}>
             <CheckRoundedIcon fontSize="small" color="inherit" />
@@ -93,20 +81,16 @@ const PayNowPayLater = ({
                 <>
                   <Typography className={css.radioTitle}>Pay now</Typography>
                   <Typography className={css.radioSubtitle} variant="body2" color="text.secondary">
-                    {canRelay ? (
-                      'Sponsored free transaction'
-                    ) : (
-                      <>
-                        &asymp; {totalFee} {chain?.nativeCurrency.symbol}
-                      </>
-                    )}
+                    <>
+                      &asymp; {totalFee} {chain?.nativeCurrency.symbol}
+                    </>
                   </Typography>
                 </>
               }
               control={<Radio />}
             />
 
-            <FormControlLabel
+            {/* <FormControlLabel
               data-testid="connected-wallet-execution-method"
               sx={{ flex: 1 }}
               value={PayMethod.PayLater}
@@ -120,7 +104,7 @@ const PayNowPayLater = ({
                 </>
               }
               control={<Radio />}
-            />
+            /> */}
           </RadioGroup>
         </FormControl>
       )}
