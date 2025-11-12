@@ -1,16 +1,15 @@
+import type { NativeStakingDepositTransactionInfo } from '@safe-global/store/gateway/AUTO_GENERATED/transactions'
 import { Box, Stack, Typography } from '@mui/material'
 import FieldsGrid from '@/components/tx/FieldsGrid'
-import type { StakingTxDepositInfo } from '@safe-global/safe-gateway-typescript-sdk'
-import { type NativeStakingDepositConfirmationView } from '@safe-global/safe-gateway-typescript-sdk'
 import ConfirmationOrderHeader from '@/components/tx/ConfirmationOrder/ConfirmationOrderHeader'
-import { formatDurationFromMilliseconds, formatVisualAmount, maybePlural } from '@/utils/formatters'
-import { formatCurrency } from '@/utils/formatNumber'
+import { formatDurationFromMilliseconds, formatVisualAmount, maybePlural } from '@safe-global/utils/utils/formatters'
+import { formatCurrency } from '@safe-global/utils/utils/formatNumber'
 import StakingStatus from '@/features/stake/components/StakingStatus'
 import { InfoTooltip } from '@/features/stake/components/InfoTooltip'
 import { BRAND_NAME } from '@/config/constants'
 
 type StakingOrderConfirmationViewProps = {
-  order: NativeStakingDepositConfirmationView | StakingTxDepositInfo
+  order: NativeStakingDepositTransactionInfo
   isTxDetails?: boolean
 }
 

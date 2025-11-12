@@ -1,0 +1,22 @@
+appId: global.safe.mobileapp.ios
+---
+# ===========================================
+# Disable Module Transaction Card
+# ===========================================
+- assertVisible:
+    text: 'Settings change'
+
+- extendedWaitUntil:
+    visible:
+      text: '.*disableModule.*'
+      optional: true
+    timeout: 2000
+
+- tapOn:
+    text: '.*disableModule.*'
+
+- runFlow:
+    file: ./disable-module-tx.yml
+
+- tapOn:
+    id: 'go-back'

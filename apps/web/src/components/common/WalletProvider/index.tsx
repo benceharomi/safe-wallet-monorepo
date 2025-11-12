@@ -1,13 +1,12 @@
 import { createContext, type ReactElement, type ReactNode, useEffect, useState, useMemo } from 'react'
 import useOnboard, { type ConnectedWallet, getConnectedWallet } from '@/hooks/wallets/useOnboard'
-import useAsync from '@/hooks/useAsync'
-import { getSafeInfo } from '@safe-global/safe-gateway-typescript-sdk'
+import { useSafesGetSafeV1Query } from '@safe-global/store/gateway/AUTO_GENERATED/safes'
 import { useWeb3ReadOnly } from '@/hooks/wallets/web3'
 import { useCurrentChain } from '@/hooks/useChains'
 import { useRouter } from 'next/router'
 import { type Eip1193Provider } from 'ethers'
 import { getNestedWallet } from '@/utils/nested-safe-wallet'
-import { sameAddress } from '@/utils/addresses'
+import { sameAddress } from '@safe-global/utils/utils/addresses'
 
 export type SignerWallet = {
   provider: Eip1193Provider | null
@@ -34,11 +33,12 @@ const WalletProvider = ({ children }: { children: ReactNode }): ReactElement => 
 
   const [signerAddress, setSignerAddress] = useState<string>()
 
-  const [nestedSafeInfo] = useAsync(() => {
-    if (signerAddress && !sameAddress(signerAddress, wallet?.address) && currentChain) {
-      return getSafeInfo(currentChain.chainId, signerAddress)
-    }
-  }, [currentChain, signerAddress, wallet?.address])
+  const { currentData: nestedSafeInfo } = useSafesGetSafeV1Query(
+    { chainId: currentChain?.chainId || '', safeAddress: signerAddress || '' },
+    {
+      skip: !signerAddress || !currentChain || sameAddress(signerAddress, wallet?.address || ''),
+    },
+  )
 
   useEffect(() => {
     if (!onboard) return

@@ -4,10 +4,10 @@ import { useVisibleBalances } from '@/hooks/useVisibleBalances'
 import useWallet from '@/hooks/wallets/useWallet'
 import { useAppSelector } from '@/store'
 import { selectSpendingLimits } from '@/store/spendingLimitsSlice'
-import { sameAddress } from '@/utils/addresses'
-import { type SafeBalanceResponse } from '@safe-global/safe-gateway-typescript-sdk'
+import { sameAddress } from '@safe-global/utils/utils/addresses'
+import { type Balances } from '@safe-global/store/gateway/AUTO_GENERATED/balances'
 
-export const useTokenAmount = (selectedToken: SafeBalanceResponse['items'][0] | undefined) => {
+export const useTokenAmount = (selectedToken: Balances['items'][0] | undefined) => {
   const spendingLimit = useSpendingLimit(selectedToken?.tokenInfo)
 
   const spendingLimitAmount = BigInt(spendingLimit?.amount || 0) - BigInt(spendingLimit?.spent || 0)

@@ -1,15 +1,14 @@
 import { BackdropComponent, BackgroundComponent } from '@/src/components/Dropdown/sheetComponents'
-import { getTokenValue, H5, View } from 'tamagui'
+import { getTokenValue, getVariable, H5, useTheme, View } from 'tamagui'
 import React, { useCallback, useEffect, useRef } from 'react'
 import BottomSheet, {
   BottomSheetFooterProps,
   BottomSheetModalProps,
-  BottomSheetView,
   BottomSheetScrollView,
   BottomSheetFooter,
 } from '@gorhom/bottom-sheet'
 import DraggableFlatList, { DragEndParams, RenderItemParams, ScaleDecorator } from 'react-native-draggable-flatlist'
-import { StyleSheet } from 'react-native'
+import { Platform, StyleSheet } from 'react-native'
 import { useRouter } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { LoadingTx } from '@/src/features/ConfirmTx/components/LoadingTx'
@@ -47,6 +46,7 @@ export function SafeBottomSheet<T>({
   const [footerHeight, setFooterHeight] = React.useState(0)
   const hasCustomItems = items?.length && Render
   const isSortable = items?.length && sortable
+  const theme = useTheme()
 
   const onClose = useCallback(() => {
     router.back()
@@ -65,11 +65,19 @@ export function SafeBottomSheet<T>({
 
   const TitleHeader = useCallback(
     () => (
-      <View justifyContent="center" marginTop="$3" marginBottom="$4" alignItems="center">
-        <H5 fontWeight={600}>{title}</H5>
+      <View
+        justifyContent="center"
+        paddingTop="$3"
+        paddingBottom="$4"
+        alignItems="center"
+        backgroundColor="$backgroundPaper"
+      >
+        <H5 fontWeight={700} tabIndex={0}>
+          {title}
+        </H5>
 
         {actions && (
-          <View position="absolute" right={'$4'} top={'$1'}>
+          <View position="absolute" right={'$4'} top={'$3'} justifyContent="center" alignItems="center">
             {actions}
           </View>
         )}
@@ -96,11 +104,12 @@ export function SafeBottomSheet<T>({
   const renderFooter: React.FC<BottomSheetFooterProps> = useCallback(
     (props) => {
       return (
-        <BottomSheetFooter animatedFooterPosition={props.animatedFooterPosition}>
+        <BottomSheetFooter animatedFooterPosition={props.animatedFooterPosition} bottomInset={insets.bottom}>
           <View
             onLayout={(e) => {
               setFooterHeight(e.nativeEvent.layout.height)
             }}
+            accessible={true}
           >
             {FooterComponent && <FooterComponent />}
           </View>
@@ -109,7 +118,6 @@ export function SafeBottomSheet<T>({
     },
     [FooterComponent, setFooterHeight],
   )
-
   return (
     <BottomSheet
       ref={ref}
@@ -120,52 +128,51 @@ export function SafeBottomSheet<T>({
       enablePanDownToClose
       overDragResistanceFactor={10}
       backgroundComponent={BackgroundComponent}
-      backdropComponent={BackdropComponent}
+      backdropComponent={() => <BackdropComponent />}
       footerComponent={isSortable ? undefined : renderFooter}
       topInset={insets.top}
+      handleIndicatorStyle={{ backgroundColor: getVariable(theme.borderMain) }}
+      accessible={false}
     >
-      <BottomSheetView
-        style={[
-          styles.contentContainer,
-          {
-            paddingBottom: insets.bottom,
-          },
-        ]}
-      >
-        {title && <TitleHeader />}
-        {isSortable ? (
-          <DraggableFlatList<T>
-            data={items}
-            style={{ marginBottom: insets.bottom }}
-            containerStyle={{ height: '100%' }}
-            contentContainerStyle={{ paddingBottom: 50 }}
-            onDragEnd={onDragEnd}
-            keyExtractor={(item, index) => (keyExtractor ? keyExtractor({ item, index }) : index.toString())}
-            renderItem={renderItem}
-          />
-        ) : (
-          <BottomSheetScrollView
-            style={{
-              marginBottom: (!sortable && FooterComponent ? footerHeight : 0) + 12,
-            }}
-            contentContainerStyle={[styles.scrollInnerContainer]}
-          >
-            <View minHeight={200} alignItems="center" paddingVertical="$3">
-              <View alignItems="flex-start" paddingBottom="$4" width="100%">
-                {loading ? (
-                  <LoadingTx />
-                ) : hasCustomItems ? (
-                  items.map((item, index) => (
-                    <Render key={keyExtractor ? keyExtractor({ item, index }) : index} item={item} onClose={onClose} />
-                  ))
-                ) : (
-                  children
-                )}
-              </View>
+      {isSortable ? (
+        <DraggableFlatList<T>
+          data={items}
+          contentContainerStyle={{ paddingBottom: insets.bottom }}
+          ListHeaderComponent={title ? <TitleHeader /> : undefined}
+          stickyHeaderIndices={title ? [0] : undefined}
+          onDragEnd={onDragEnd}
+          keyExtractor={(item, index) => (keyExtractor ? keyExtractor({ item, index }) : index.toString())}
+          renderItem={renderItem}
+        />
+      ) : (
+        <BottomSheetScrollView
+          accessible={false}
+          contentContainerStyle={[
+            styles.scrollInnerContainer,
+            {
+              paddingBottom:
+                (!sortable && FooterComponent ? footerHeight : insets.bottom) +
+                getTokenValue(Platform.OS === 'ios' ? '$4' : '$8'),
+            },
+          ]}
+          stickyHeaderIndices={[0]}
+        >
+          {title && <TitleHeader />}
+          <View minHeight={200} alignItems="center" paddingVertical="$3">
+            <View alignItems="flex-start" paddingBottom="$4" width="100%">
+              {loading ? (
+                <LoadingTx />
+              ) : hasCustomItems ? (
+                items.map((item, index) => (
+                  <Render key={keyExtractor ? keyExtractor({ item, index }) : index} item={item} onClose={onClose} />
+                ))
+              ) : (
+                children
+              )}
             </View>
-          </BottomSheetScrollView>
-        )}
-      </BottomSheetView>
+          </View>
+        </BottomSheetScrollView>
+      )}
     </BottomSheet>
   )
 }
@@ -175,6 +182,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-around',
   },
   scrollInnerContainer: {
-    paddingHorizontal: getTokenValue('$3'),
+    paddingHorizontal: getTokenValue('$2'),
   },
 })

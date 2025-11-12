@@ -1,19 +1,15 @@
-import { SafeButton } from '@/src/components/SafeButton'
 import React from 'react'
-import { Text, View, YStack } from 'tamagui'
+import { Text, YStack } from 'tamagui'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 export function AlreadySigned() {
-  return (
-    <YStack justifyContent="center" gap="$4" alignItems="center" paddingHorizontal={'$4'}>
-      <Text fontSize="$4" fontWeight={400} textAlign="center" color="$textSecondaryLight">
-        You have already signed this transaction.
-      </Text>
+  const insets = useSafeAreaInsets()
 
-      <View height={50} width="100%">
-        <SafeButton height="100%" rounded fullscreen fontWeight={600} disabled>
-          Confirm
-        </SafeButton>
-      </View>
+  return (
+    <YStack paddingBottom={insets.bottom ? insets.bottom : '$4'}>
+      <Text fontSize="$4" fontWeight={400} textAlign="center" color="$textSecondaryLight" marginBottom="$2">
+        Can be executed once the threshold is reached.
+      </Text>
     </YStack>
   )
 }

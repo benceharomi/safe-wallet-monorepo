@@ -1,11 +1,10 @@
-import type { UndeployedSafe } from '@/features/counterfactual/store/undeployedSafesSlice'
-
 import * as allOwnedSafes from '@/features/myAccounts/hooks/useAllOwnedSafes'
 import useAllSafes, { _buildSafeItem, _prepareAddresses } from '@/features/myAccounts/hooks/useAllSafes'
 import * as useChains from '@/hooks/useChains'
 import * as useWallet from '@/hooks/wallets/useWallet'
 import { renderHook } from '@/tests/test-utils'
-import type { ChainInfo } from '@safe-global/safe-gateway-typescript-sdk'
+import type { Chain } from '@safe-global/store/gateway/AUTO_GENERATED/chains'
+import type { UndeployedSafe } from '@safe-global/utils/features/counterfactual/store/types'
 
 describe('useAllSafes hook', () => {
   beforeEach(() => {
@@ -13,7 +12,7 @@ describe('useAllSafes hook', () => {
 
     jest.spyOn(allOwnedSafes, 'default').mockReturnValue([undefined, undefined, false])
     jest.spyOn(useChains, 'default').mockImplementation(() => ({
-      configs: [{ chainId: '1' } as ChainInfo],
+      configs: [{ chainId: '1' } as Chain],
     }))
   })
 

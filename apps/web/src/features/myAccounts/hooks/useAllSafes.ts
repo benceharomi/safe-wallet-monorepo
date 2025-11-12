@@ -1,13 +1,14 @@
-import type { AllOwnedSafes } from '@safe-global/safe-gateway-typescript-sdk'
+import type { AllOwnedSafes } from '@safe-global/store/gateway/types'
 import { useMemo } from 'react'
 import { useAppSelector } from '@/store'
 import type { AddedSafesState } from '@/store/addedSafesSlice'
 import { selectAllAddedSafes } from '@/store/addedSafesSlice'
 import useChains from '@/hooks/useChains'
 import useWallet from '@/hooks/wallets/useWallet'
-import type { AddressBookState, UndeployedSafesState, VisitedSafesState } from '@/store/slices'
+import type { AddressBookState, VisitedSafesState } from '@/store/slices'
+import type { UndeployedSafesState } from '@safe-global/utils/features/counterfactual/store/types'
 import { selectAllAddressBooks, selectAllVisitedSafes, selectUndeployedSafes } from '@/store/slices'
-import { sameAddress } from '@/utils/addresses'
+import { sameAddress } from '@safe-global/utils/utils/addresses'
 import useAllOwnedSafes from './useAllOwnedSafes'
 
 export type SafeItem = {

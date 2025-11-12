@@ -1,8 +1,9 @@
-import { trackEvent } from '@/services/analytics'
+import type { TransactionDetails } from '@safe-global/store/gateway/AUTO_GENERATED/transactions'
+import { useCallback, useRef } from 'react'
+import { MODALS_EVENTS, trackEvent } from '@/services/analytics'
 import { TX_EVENTS } from '@/services/analytics/events/transactions'
 import { getTransactionTrackingType } from '@/services/analytics/tx-tracking'
 import { isNestedConfirmationTxInfo } from '@/utils/transaction-guards'
-import type { TransactionDetails } from '@safe-global/safe-gateway-typescript-sdk'
 
 function getCreationEvent(args: { isParentSigner: boolean; isRoleExecution: boolean; isProposerCreation: boolean }) {
   if (args.isParentSigner) {
@@ -48,6 +49,7 @@ export function trackTxEvents(
   isProposerCreation: boolean,
   isParentSigner: boolean,
   origin?: string,
+  isMassPayout: boolean = false,
 ) {
   const isNestedConfirmation = !!details && isNestedConfirmationTxInfo(details.txInfo)
 
@@ -65,11 +67,24 @@ export function trackTxEvents(
     return confirmationEvent
   })()
 
-  const txType = getTransactionTrackingType(details, origin)
+  const txType = getTransactionTrackingType(details, origin, isMassPayout)
   trackEvent({ ...event, label: txType })
 
   // Immediate execution on creation
   if (isCreation && isExecuted) {
     trackEvent({ ...executionEvent, label: txType })
   }
+}
+
+export function useTrackTimeSpent() {
+  const startTime = useRef(Date.now())
+
+  return useCallback(() => {
+    const secondsElapsed = Math.round((Date.now() - startTime.current) / 1000)
+
+    trackEvent({
+      ...MODALS_EVENTS.RECEIPT_TIME_SPENT,
+      label: secondsElapsed,
+    })
+  }, [startTime])
 }

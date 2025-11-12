@@ -1,16 +1,17 @@
-import { type SafeBalanceResponse, TokenType } from '@safe-global/safe-gateway-typescript-sdk'
+import { TokenType } from '@safe-global/store/gateway/types'
 import * as store from '@/store'
 import * as useBalancesHooks from '@/hooks/useBalances'
 import { renderHook } from '@/tests/test-utils'
 import { toBeHex } from 'ethers'
 import { useVisibleBalances } from '../useVisibleBalances'
+import { type Balances } from '@safe-global/store/gateway/AUTO_GENERATED/balances'
 
 describe('useVisibleBalances', () => {
   const hiddenTokenAddress = toBeHex('0x2', 20)
   const visibleTokenAddress = toBeHex('0x3', 20)
 
   test('empty balance', () => {
-    const balance: SafeBalanceResponse = {
+    const balance: Balances = {
       fiatTotal: '0',
       items: [],
     }
@@ -18,6 +19,7 @@ describe('useVisibleBalances', () => {
       balances: balance,
       error: undefined,
       loading: false,
+      loaded: true,
     }))
 
     jest.spyOn(store, 'useAppSelector').mockImplementation((selector) =>
@@ -34,7 +36,7 @@ describe('useVisibleBalances', () => {
           },
           hiddenTokens: { ['4']: [hiddenTokenAddress] },
         },
-        chains: { data: [], error: undefined, loading: false },
+        chains: { data: [], error: undefined, loading: false, loaded: true },
       } as unknown as store.RootState),
     )
 
@@ -45,7 +47,7 @@ describe('useVisibleBalances', () => {
   })
 
   test('return only visible balance', () => {
-    const balance: SafeBalanceResponse = {
+    const balance: Balances = {
       fiatTotal: '100',
       items: [
         {
@@ -81,6 +83,7 @@ describe('useVisibleBalances', () => {
       balances: balance,
       error: undefined,
       loading: false,
+      loaded: true,
     }))
 
     jest.spyOn(store, 'useAppSelector').mockImplementation((selector) =>
@@ -97,7 +100,7 @@ describe('useVisibleBalances', () => {
           },
           hiddenTokens: { ['4']: [hiddenTokenAddress] },
         },
-        chains: { data: [], error: undefined, loading: false },
+        chains: { data: [], error: undefined, loading: false, loaded: true },
       } as unknown as store.RootState),
     )
 
@@ -108,7 +111,7 @@ describe('useVisibleBalances', () => {
   })
 
   test('computation works for high precision numbers', () => {
-    const balance: SafeBalanceResponse = {
+    const balance: Balances = {
       fiatTotal: '200.01234567890123456789',
       items: [
         {
@@ -157,11 +160,12 @@ describe('useVisibleBalances', () => {
       balances: balance,
       error: undefined,
       loading: false,
+      loaded: true,
     }))
 
     jest.spyOn(store, 'useAppSelector').mockImplementation((selector) =>
       selector({
-        balances: { data: balance, error: undefined, loading: false },
+        balances: { data: balance, error: undefined, loading: false, loaded: true },
         settings: {
           currency: 'USD',
           shortName: {
@@ -174,7 +178,7 @@ describe('useVisibleBalances', () => {
           },
           hiddenTokens: { ['4']: [hiddenTokenAddress] },
         },
-        chains: { data: [], error: undefined, loading: false },
+        chains: { data: [], error: undefined, loading: false, loaded: true },
       } as unknown as store.RootState),
     )
 
@@ -185,7 +189,7 @@ describe('useVisibleBalances', () => {
   })
 
   test('computation works for high USD values', () => {
-    const balance: SafeBalanceResponse = {
+    const balance: Balances = {
       // Current total USD value of all Safes on mainnet * 1 million
       fiatTotal: '28303710905000100.0123456789',
       items: [
@@ -222,6 +226,7 @@ describe('useVisibleBalances', () => {
       balances: balance,
       error: undefined,
       loading: false,
+      loaded: true,
     }))
 
     jest.spyOn(store, 'useAppSelector').mockImplementation((selector) =>
@@ -238,7 +243,7 @@ describe('useVisibleBalances', () => {
           },
           hiddenTokens: { ['4']: [hiddenTokenAddress] },
         },
-        chains: { data: [], error: undefined, loading: false },
+        chains: { data: [], error: undefined, loading: false, loaded: true },
       } as unknown as store.RootState),
     )
 

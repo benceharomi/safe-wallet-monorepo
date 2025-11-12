@@ -7,32 +7,32 @@ import TxLayout from '@/components/tx-flow/common/TxLayout'
 import ErrorMessage from '@/components/tx/ErrorMessage'
 import { ExecutionMethod, ExecutionMethodSelector } from '@/components/tx/ExecutionMethodSelector'
 import { safeCreationDispatch, SafeCreationEvent } from '@/features/counterfactual/services/safeCreationEvents'
-import { selectUndeployedSafe, type UndeployedSafe } from '@/features/counterfactual/store/undeployedSafesSlice'
+import { selectUndeployedSafe } from '@/features/counterfactual/store/undeployedSafesSlice'
 import { CF_TX_GROUP_KEY, extractCounterfactualSafeSetup, isPredictedSafeProps } from '@/features/counterfactual/utils'
 import useChainId from '@/hooks/useChainId'
 import { useCurrentChain } from '@/hooks/useChains'
-import useGasPrice, { getTotalFeeFormatted } from '@/hooks/useGasPrice'
 import { useLeastRemainingRelays } from '@/hooks/useRemainingRelays'
 import useSafeInfo from '@/hooks/useSafeInfo'
 import useWalletCanPay from '@/hooks/useWalletCanPay'
 import useWallet from '@/hooks/wallets/useWallet'
 import { OVERVIEW_EVENTS, trackEvent, WALLET_EVENTS } from '@/services/analytics'
 import { TX_EVENTS, TX_TYPES } from '@/services/analytics/events/transactions'
-import { asError } from '@/services/exceptions/utils'
+import { asError } from '@safe-global/utils/services/exceptions/utils'
 import { useAppSelector } from '@/store'
-import { hasFeature } from '@/utils/chains'
 import { hasRemainingRelays } from '@/utils/relaying'
 import { Box, Button, CircularProgress, Divider, Grid, Typography } from '@mui/material'
-import type { DeploySafeProps } from '@safe-global/protocol-kit'
-import { FEATURES } from '@/utils/chains'
 import React, { useContext, useMemo, useState } from 'react'
-import { getLatestSafeVersion } from '@/utils/chains'
-import { sameAddress } from '@/utils/addresses'
+import { sameAddress } from '@safe-global/utils/utils/addresses'
 import { useEstimateSafeCreationGas } from '@/components/new-safe/create/useEstimateSafeCreationGas'
 import useIsWrongChain from '@/hooks/useIsWrongChain'
 import NetworkWarning from '@/components/new-safe/create/NetworkWarning'
 import CheckWallet from '@/components/common/CheckWallet'
 import { getSafeToL2SetupDeployment } from '@safe-global/safe-deployments'
+import { FEATURES, hasFeature } from '@safe-global/utils/utils/chains'
+import type { UndeployedSafe } from '@safe-global/utils/features/counterfactual/store/types'
+import type { TransactionOptions } from '@safe-global/types-kit'
+import { getTotalFeeFormatted } from '@safe-global/utils/hooks/useDefaultGasPrice'
+import useGasPrice from '@/hooks/useGasPrice'
 
 const useActivateAccount = (undeployedSafe: UndeployedSafe | undefined) => {
   const chain = useCurrentChain()
@@ -49,7 +49,7 @@ const useActivateAccount = (undeployedSafe: UndeployedSafe | undefined) => {
   const maxFeePerGas = gasPrice?.maxFeePerGas
   const maxPriorityFeePerGas = gasPrice?.maxPriorityFeePerGas
 
-  const options: DeploySafeProps['options'] = isEIP1559
+  const options: TransactionOptions = isEIP1559
     ? {
         maxFeePerGas: maxFeePerGas?.toString(),
         maxPriorityFeePerGas: maxPriorityFeePerGas?.toString(),
@@ -94,7 +94,7 @@ const ActivateAccountFlow = () => {
 
   if (!undeployedSafe || !undeployedSafeSetup) return null
 
-  const { owners, threshold, safeVersion } = undeployedSafeSetup
+  const { owners, threshold } = undeployedSafeSetup
 
   const safeToL2SetupDeployment = getSafeToL2SetupDeployment({ version: '1.4.1', network: chain?.chainId })
   const safeToL2SetupAddress = safeToL2SetupDeployment?.defaultAddress
@@ -129,7 +129,6 @@ const ActivateAccountFlow = () => {
         await createNewSafe(
           wallet.provider,
           undeployedSafe.props,
-          safeVersion ?? getLatestSafeVersion(chain),
           chain,
           options,
           onSubmit,
@@ -147,7 +146,7 @@ const ActivateAccountFlow = () => {
   const submitDisabled = !isSubmittable || isWrongChain
 
   return (
-    <TxLayout title="Activate account" hideNonce>
+    <TxLayout title="Activate account" hideNonce hideSafeShield>
       <TxCard>
         <Typography>
           You&apos;re about to deploy this Safe Account and will have to confirm the transaction with your connected

@@ -1,6 +1,5 @@
 import { useContext, useEffect, useState, type ReactElement } from 'react'
 import classnames from 'classnames'
-import { Alert } from '@mui/material'
 
 import Header from '@/components/common/Header'
 import css from './styles.module.css'
@@ -10,59 +9,52 @@ import SideDrawer from './SideDrawer'
 import { useIsSidebarRoute } from '@/hooks/useIsSidebarRoute'
 import { TxModalContext } from '@/components/tx-flow'
 import BatchSidebar from '@/components/batch/BatchSidebar'
-import { TemporaryDialog } from '@/components/common/TemporaryDialog'
-import ExternalLink from '../ExternalLink'
-import { IS_PRODUCTION } from '@/config/constants'
-
-const StickyBanner = () => (
-  <Alert severity="warning">
-    ALWAYS{' '}
-    <ExternalLink href="https://help.safe.global/en/articles/276343-how-to-perform-basic-transactions-checks-on-safe-wallet">
-      verify transactions
-    </ExternalLink>{' '}
-    that you are approving on your signer wallet. If you can’t verify it, don’t sign it.
-  </Alert>
-)
+import Breadcrumbs from '@/components/common/Breadcrumbs'
+import { AppRoutes } from '@/config/routes'
 
 const PageLayout = ({ pathname, children }: { pathname: string; children: ReactElement }): ReactElement => {
   const [isSidebarRoute, isAnimated] = useIsSidebarRoute(pathname)
   const [isSidebarOpen, setSidebarOpen] = useState<boolean>(true)
   const [isBatchOpen, setBatchOpen] = useState<boolean>(false)
-  const { setFullWidth } = useContext(TxModalContext)
+  const { txFlow, setFullWidth } = useContext(TxModalContext)
+  const isSafeLabsTermsPage = pathname === AppRoutes.safeLabsTerms
+  const isWelcomePage = pathname === AppRoutes.welcome.index
+  const hideHeader = isSafeLabsTermsPage || isWelcomePage
+
+  // Hide sidebar when transaction flow is open
+  const isSidebarVisible = isSidebarOpen && !txFlow
 
   useEffect(() => {
-    setFullWidth(!isSidebarOpen)
-  }, [isSidebarOpen, setFullWidth])
+    setFullWidth(!isSidebarVisible)
+  }, [isSidebarVisible, setFullWidth])
 
   return (
     <>
-      <header className={css.header}>
-        <Header onMenuToggle={isSidebarRoute ? setSidebarOpen : undefined} onBatchToggle={setBatchOpen} />
-      </header>
+      {!hideHeader && (
+        <header className={css.header}>
+          <Header onMenuToggle={isSidebarRoute ? setSidebarOpen : undefined} onBatchToggle={setBatchOpen} />
+        </header>
+      )}
 
-      {isSidebarRoute && <SideDrawer isOpen={isSidebarOpen} onToggle={setSidebarOpen} />}
+      {isSidebarRoute ? <SideDrawer isOpen={isSidebarVisible} onToggle={setSidebarOpen} /> : null}
 
       <div
         className={classnames(css.main, {
-          [css.mainNoSidebar]: !isSidebarOpen || !isSidebarRoute,
+          [css.mainNoSidebar]: !isSidebarVisible || !isSidebarRoute,
           [css.mainAnimated]: isSidebarRoute && isAnimated,
+          [css.mainNoHeader]: hideHeader,
         })}
       >
         <div className={css.content}>
-          {IS_PRODUCTION && (
-            <div className={css.sticky}>
-              <StickyBanner />
-            </div>
-          )}
-
-          <SafeLoadingError>{children}</SafeLoadingError>
+          <SafeLoadingError>
+            {!hideHeader && <Breadcrumbs />}
+            {children}
+          </SafeLoadingError>
         </div>
 
         <BatchSidebar isOpen={isBatchOpen} onToggle={setBatchOpen} />
 
-        <Footer />
-
-        {IS_PRODUCTION && <TemporaryDialog />}
+        {!isSafeLabsTermsPage && <Footer />}
       </div>
     </>
   )

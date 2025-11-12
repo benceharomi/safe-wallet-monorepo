@@ -3,6 +3,7 @@ import * as owner from '../pages/owners.pages.js'
 import { getSafes, CATEGORIES } from '../../support/safes/safesHandler.js'
 import * as wallet from '../../support/utils/wallet.js'
 import * as proposer from '../pages/proposers.pages.js'
+import * as navigation from '../pages/navigation.page.js'
 
 let staticSafes = []
 const walletCredentials = JSON.parse(Cypress.env('CYPRESS_WALLET_CREDENTIALS'))
@@ -15,12 +16,12 @@ const proposerName2 = 'Proposer 2'
 const proposerName = 'Proposer 1'
 const changedProposerName = 'Changed proposer name'
 
-describe('Happy path Proposers tests', () => {
+describe('Happy path Proposers tests', { defaultCommandTimeout: 30000 }, () => {
   before(async () => {
     staticSafes = await getSafes(CATEGORIES.static)
   })
 
-  it.skip('Verify that editing a proposer is only possible for the proposer created by the creator', () => {
+  it('Verify that editing a proposer is only possible for the proposer created by the creator', () => {
     cy.visit(constants.setupUrl + staticSafes.SEP_STATIC_SAFE_31)
     wallet.connectSigner(signer3)
     cy.contains(owner.safeAccountNonceStr, { timeout: 10000 })
@@ -39,10 +40,11 @@ describe('Happy path Proposers tests', () => {
     proposer.checkProposerData([proposerName2])
   })
 
-  it.skip('Verify a proposer can be added', () => {
+  it('Verify a proposer can be added', () => {
     cy.visit(constants.setupUrl + staticSafes.SEP_STATIC_SAFE_32)
     wallet.connectSigner(signer)
     cy.contains(owner.safeAccountNonceStr, { timeout: 10000 })
+    navigation.verifyTxBtnStatus(constants.enabledStates.enabled)
     proposer.deleteAllProposers()
     proposer.clickOnAddProposerBtn()
     proposer.enterProposerData(addedProposer, proposerName)

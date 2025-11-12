@@ -1,11 +1,10 @@
-import { defaultSecurityContextValues } from '@/components/tx/security/shared/TxSecurityContext'
 import { type ReactElement } from 'react'
 import * as hooks from '@/components/tx/SignOrExecuteForm/hooks'
 import * as useValidateTxData from '@/hooks/useValidateTxData'
 import { SignForm } from '@/components/tx/SignOrExecuteForm/SignForm'
 import { render } from '@/tests/test-utils'
 import { createMockSafeTransaction } from '@/tests/transactions'
-import { OperationType } from '@safe-global/safe-core-sdk-types'
+import { OperationType } from '@safe-global/types-kit'
 import { fireEvent, waitFor } from '@testing-library/react'
 
 // We assume that CheckWallet always returns true
@@ -34,7 +33,13 @@ describe('SignForm', () => {
       executeTx: jest.fn(),
       signProposerTx: jest.fn(),
     },
-    txSecurity: defaultSecurityContextValues,
+    txSecurity: {
+      setRecipientAddresses: jest.fn(),
+      setSafeTx: jest.fn(),
+      needsRiskConfirmation: false,
+      isRiskConfirmed: false,
+      setIsRiskConfirmed: jest.fn(),
+    },
   }
 
   beforeEach(() => {
@@ -205,7 +210,7 @@ describe('SignForm', () => {
       <SignForm
         {...defaultProps}
         safeTx={safeTransaction}
-        txSecurity={{ ...defaultSecurityContextValues, needsRiskConfirmation: true, isRiskConfirmed: false }}
+        txSecurity={{ ...defaultProps.txSecurity, needsRiskConfirmation: true, isRiskConfirmed: false }}
       />,
     )
 
@@ -220,7 +225,7 @@ describe('SignForm', () => {
       <SignForm
         {...defaultProps}
         safeTx={safeTransaction}
-        txSecurity={{ ...defaultSecurityContextValues, needsRiskConfirmation: true, isRiskConfirmed: true }}
+        txSecurity={{ ...defaultProps.txSecurity, needsRiskConfirmation: true, isRiskConfirmed: true }}
       />,
     )
 
@@ -235,7 +240,7 @@ describe('SignForm', () => {
       <SignForm
         {...defaultProps}
         safeTx={safeTransaction}
-        txSecurity={{ ...defaultSecurityContextValues, needsRiskConfirmation: true, isRiskConfirmed: true }}
+        txSecurity={{ ...defaultProps.txSecurity, needsRiskConfirmation: true, isRiskConfirmed: true }}
         origin="MockOrigin"
       />,
     )

@@ -49,7 +49,7 @@ export const SafeButton = styled(Button, {
       true: {
         backgroundColor: 'transparent',
         borderWidth: 2,
-        borderColor: '$color',
+        borderColor: '$backgroundSecondary',
         color: '$color',
       },
     },
@@ -62,7 +62,7 @@ export const SafeButton = styled(Button, {
     },
 
     disabled: {
-      true: (props, allProps) => {
+      true: (_, allProps) => {
         // @ts-expect-error
         const isText = allProps.props?.text === true
         return {
@@ -73,25 +73,40 @@ export const SafeButton = styled(Button, {
     },
 
     size: {
+      $xl: () => ({
+        fontSize: 14,
+        fontWeight: 700,
+        height: 'auto',
+        margin: 0,
+        paddingVertical: '$3',
+        textProps: {
+          lineHeight: 24,
+        },
+      }),
       $md: () => ({
         height: 'auto',
         paddingVertical: 14,
         paddingHorizontal: 20,
         margin: 0,
-        lineHeight: 20,
-        fontWeight: 600,
+        fontWeight: 700,
         letterSpacing: -0.1,
         fontSize: 14,
         scaleIcon: 0.9,
         scaleSpace: 0.3,
+        textProps: {
+          marginBottom: -2.5,
+        },
       }),
       $sm: () => ({
-        height: 'auto',
+        height: 36,
         paddingVertical: '$2',
+        paddingHorizontal: '$3',
         fontWeight: 600,
         scaleIcon: 0.8,
-        lineHeight: 20,
         scaleSpace: 0.2,
+        textProps: {
+          marginBottom: -2.5,
+        },
       }),
     },
   } as const,

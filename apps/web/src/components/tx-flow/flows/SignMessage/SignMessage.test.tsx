@@ -1,9 +1,9 @@
+import type { MessageItem } from '@safe-global/store/gateway/AUTO_GENERATED/messages'
 import type Safe from '@safe-global/protocol-kit'
 import { act } from 'react'
 import { extendedSafeInfoBuilder } from '@/tests/builders/safe'
 import { hexlify, zeroPadValue, toUtf8Bytes } from 'ethers'
-import type { SafeInfo, SafeMessage } from '@safe-global/safe-gateway-typescript-sdk'
-import { SafeMessageListItemType } from '@safe-global/safe-gateway-typescript-sdk'
+import type { SafeState } from '@safe-global/store/gateway/AUTO_GENERATED/safes'
 import SignMessage from './SignMessage'
 
 import * as useIsWrongChainHook from '@/hooks/useIsWrongChain'
@@ -18,14 +18,18 @@ import * as sdk from '@/hooks/coreSDK/safeCoreSDK'
 import { render, fireEvent, waitFor } from '@/tests/test-utils'
 import type { ConnectedWallet } from '@/hooks/wallets/useOnboard'
 import type { EIP1193Provider, WalletState, AppState, OnboardAPI } from '@web3-onboard/core'
-import { generateSafeMessageHash } from '@/utils/safe-messages'
-import { getSafeMessage } from '@safe-global/safe-gateway-typescript-sdk'
+import { generateSafeMessageHash } from '@safe-global/utils/utils/safe-messages'
 import { chainBuilder } from '@/tests/builders/chains'
+import { http, HttpResponse } from 'msw'
+import { server } from '@/tests/server'
+import { GATEWAY_URL } from '@/config/gateway'
+import type { Message } from '@safe-global/store/gateway/AUTO_GENERATED/messages'
+import { SafeShieldProvider } from '@/features/safe-shield/SafeShieldContext'
+import type { ReactElement } from 'react'
 
-jest.mock('@safe-global/safe-gateway-typescript-sdk', () => ({
-  ...jest.requireActual('@safe-global/safe-gateway-typescript-sdk'),
-  getSafeMessage: jest.fn(),
-}))
+const renderWithSafeShield = (ui: ReactElement) => {
+  return render(<SafeShieldProvider>{ui}</SafeShieldProvider>)
+}
 
 let mockProvider = {
   request: jest.fn,
@@ -39,16 +43,17 @@ const mockOnboardState = {
       label: 'Wallet 1',
       icon: '',
       provider: mockProvider,
-      chains: [{ id: '0x5' }],
+      chains: [{ id: '0x5', namespace: 'evm' }],
       accounts: [
         {
           address: '0x1234567890123456789012345678901234567890',
           ens: null,
+          uns: null,
           balance: null,
         },
       ],
     },
-  ] as WalletState[],
+  ] as unknown as WalletState[],
   accountCenter: {
     enabled: true,
   },
@@ -112,7 +117,7 @@ describe('SignMessage', () => {
     const EXAMPLE_MESSAGE = 'Hello world!'
 
     it('renders the (decoded) message', () => {
-      const { getByText } = render(
+      const { getByText } = renderWithSafeShield(
         <SignMessage
           requestId="123"
           logoUri="www.fake.com/test.png"
@@ -125,7 +130,7 @@ describe('SignMessage', () => {
     })
 
     it('displays the SafeMessage message', () => {
-      const { getByText } = render(
+      const { getByText } = renderWithSafeShield(
         <SignMessage logoUri="www.fake.com/test.png" name="Test App" message={EXAMPLE_MESSAGE} requestId="123" />,
       )
 
@@ -133,7 +138,7 @@ describe('SignMessage', () => {
     })
 
     it('generates the SafeMessage hash if not provided', () => {
-      const { getByText } = render(
+      const { getByText } = renderWithSafeShield(
         <SignMessage logoUri="www.fake.com/test.png" name="Test App" message={EXAMPLE_MESSAGE} requestId="123" />,
       )
 
@@ -181,7 +186,7 @@ describe('SignMessage', () => {
     }
 
     it('renders the message', () => {
-      const { getByText } = render(
+      const { getByText } = renderWithSafeShield(
         <SignMessage requestId="123" logoUri="www.fake.com/test.png" name="Test App" message={EXAMPLE_MESSAGE} />,
       )
 
@@ -193,7 +198,7 @@ describe('SignMessage', () => {
     })
 
     it('displays the SafeMessage message', () => {
-      const { getByText } = render(
+      const { getByText } = renderWithSafeShield(
         <SignMessage logoUri="www.fake.com/test.png" name="Test App" message={EXAMPLE_MESSAGE} requestId="123" />,
       )
 
@@ -201,7 +206,7 @@ describe('SignMessage', () => {
     })
 
     it('generates the SafeMessage hash if not provided', () => {
-      const { getByText } = render(
+      const { getByText } = renderWithSafeShield(
         <SignMessage logoUri="www.fake.com/test.png" name="Test App" message={EXAMPLE_MESSAGE} requestId="123" />,
       )
 
@@ -213,9 +218,15 @@ describe('SignMessage', () => {
     jest.spyOn(useIsSafeOwnerHook, 'default').mockImplementation(() => true)
     jest.spyOn(onboard, 'default').mockReturnValue(mockOnboard)
     jest.spyOn(useWalletHook, 'default').mockReturnValue({} as ConnectedWallet)
-    ;(getSafeMessage as jest.Mock).mockRejectedValue(new Error('SafeMessage not found'))
 
-    const { getByText, baseElement } = render(
+    // Mock message not found
+    server.use(
+      http.get(`${GATEWAY_URL}/v1/chains/:chainId/messages/:messageHash`, () => {
+        return HttpResponse.error()
+      }),
+    )
+
+    const { getByText, baseElement } = renderWithSafeShield(
       <SignMessage
         logoUri="www.fake.com/test.png"
         name="Test App"
@@ -228,7 +239,7 @@ describe('SignMessage', () => {
     const proposalSpy = jest.spyOn(sender, 'dispatchSafeMsgProposal').mockImplementation(() => Promise.resolve())
     const mockMessageHash = '0x456'
     const msg = {
-      type: SafeMessageListItemType.MESSAGE,
+      type: 'MESSAGE',
       messageHash: mockMessageHash,
       confirmations: [
         {
@@ -239,9 +250,16 @@ describe('SignMessage', () => {
       ],
       confirmationsRequired: 2,
       confirmationsSubmitted: 1,
-    } as unknown as SafeMessage
+    } as unknown as MessageItem
 
-    ;(getSafeMessage as jest.Mock).mockResolvedValue(msg)
+    // Mock getSafeMessage response
+    server.use(
+      http.get(`${GATEWAY_URL}/v1/chains/:chainId/messages/:messageHash`, () => {
+        const msgWithoutType = { ...msg }
+        delete (msgWithoutType as any).type
+        return HttpResponse.json(msgWithoutType as Message)
+      }),
+    )
 
     const button = getByText('Sign')
 
@@ -279,11 +297,11 @@ describe('SignMessage', () => {
           value: zeroPadValue('0x01', 20),
         },
         chainId: '5',
-      } as SafeInfo,
+      } as SafeState,
       messageText,
     )
     const msg = {
-      type: SafeMessageListItemType.MESSAGE,
+      type: 'MESSAGE',
       messageHash,
       confirmations: [
         {
@@ -294,20 +312,7 @@ describe('SignMessage', () => {
       ],
       confirmationsRequired: 2,
       confirmationsSubmitted: 1,
-    } as unknown as SafeMessage
-
-    jest.spyOn(useSafeMessage, 'default').mockReturnValueOnce([msg, jest.fn, undefined])
-
-    const { getByText, rerender } = render(
-      <SignMessage logoUri="www.fake.com/test.png" name="Test App" message={messageText} requestId="123" />,
-    )
-
-    const confirmationSpy = jest
-      .spyOn(sender, 'dispatchSafeMsgConfirmation')
-      .mockImplementation(() => Promise.resolve())
-
-    const button = getByText('Sign')
-    expect(button).toBeEnabled()
+    } as unknown as MessageItem
 
     const newMsg = {
       ...msg,
@@ -326,17 +331,39 @@ describe('SignMessage', () => {
       confirmationsRequired: 2,
       confirmationsSubmitted: 2,
       preparedSignature: '0x789',
-    } as unknown as SafeMessage
+    } as unknown as MessageItem
 
-    ;(getSafeMessage as jest.Mock).mockResolvedValue(newMsg)
+    // Mock getSafeMessage response
+    server.use(
+      http.get(`${GATEWAY_URL}/v1/chains/:chainId/messages/:messageHash`, () => {
+        const msgWithoutType = { ...newMsg }
+        delete (msgWithoutType as any).type
+        return HttpResponse.json(msgWithoutType as Message)
+      }),
+    )
+
+    // Use a mutable object to control the return value
+    let currentMessage = msg
+    const mockSetMessage = jest.fn((newVal) => {
+      currentMessage = newVal
+    })
+
+    jest.spyOn(useSafeMessage, 'default').mockImplementation(() => [currentMessage, mockSetMessage, undefined])
+
+    const { getByText } = renderWithSafeShield(
+      <SignMessage logoUri="www.fake.com/test.png" name="Test App" message={messageText} requestId="123" />,
+    )
+
+    const confirmationSpy = jest
+      .spyOn(sender, 'dispatchSafeMsgConfirmation')
+      .mockImplementation(() => Promise.resolve())
+
+    const button = getByText('Sign')
+    expect(button).toBeEnabled()
 
     act(() => {
       fireEvent.click(button)
     })
-
-    jest.spyOn(useSafeMessage, 'default').mockReturnValue([newMsg, jest.fn, undefined])
-
-    rerender(<SignMessage logoUri="www.fake.com/test.png" name="Test App" message={messageText} requestId="123" />)
 
     expect(confirmationSpy).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -356,7 +383,7 @@ describe('SignMessage', () => {
     jest.spyOn(useIsSafeOwnerHook, 'default').mockImplementation(() => false)
     jest.spyOn(useSafeMessage, 'default').mockImplementation(() => [undefined, jest.fn(), undefined])
 
-    const { getByText } = render(
+    const { getByText } = renderWithSafeShield(
       <SignMessage
         logoUri="www.fake.com/test.png"
         name="Test App"
@@ -378,7 +405,7 @@ describe('SignMessage', () => {
     jest.spyOn(useChainsHook, 'useCurrentChain').mockReturnValue(chainBuilder().build())
     jest.spyOn(useSafeMessage, 'default').mockImplementation(() => [undefined, jest.fn(), undefined])
 
-    const { getByText, queryByText } = render(
+    const { getByText, queryByText } = renderWithSafeShield(
       <SignMessage
         logoUri="www.fake.com/test.png"
         name="Test App"
@@ -403,7 +430,7 @@ describe('SignMessage', () => {
     jest.spyOn(useIsSafeOwnerHook, 'default').mockImplementation(() => false)
     jest.spyOn(useSafeMessage, 'default').mockImplementation(() => [undefined, jest.fn(), undefined])
 
-    const { getByText } = render(
+    const { getByText } = renderWithSafeShield(
       <SignMessage
         logoUri="www.fake.com/test.png"
         name="Test App"
@@ -437,11 +464,11 @@ describe('SignMessage', () => {
           value: zeroPadValue('0x01', 20),
         },
         chainId: '5',
-      } as SafeInfo,
+      } as SafeState,
       messageText,
     )
     const msg = {
-      type: SafeMessageListItemType.MESSAGE,
+      type: 'MESSAGE',
       messageHash,
       confirmations: [
         {
@@ -452,11 +479,11 @@ describe('SignMessage', () => {
       ],
       confirmationsRequired: 2,
       confirmationsSubmitted: 1,
-    } as unknown as SafeMessage
+    } as unknown as MessageItem
 
     jest.spyOn(useSafeMessage, 'default').mockReturnValue([msg, jest.fn, undefined])
 
-    const { getByText } = render(
+    const { getByText } = renderWithSafeShield(
       <SignMessage logoUri="www.fake.com/test.png" name="Test App" message={messageText} requestId="123" />,
     )
 
@@ -479,13 +506,19 @@ describe('SignMessage', () => {
     jest.spyOn(useSafeMessage, 'default').mockReturnValue([undefined, jest.fn(), undefined])
 
     jest.spyOn(useIsSafeOwnerHook, 'default').mockImplementation(() => true)
-    ;(getSafeMessage as jest.Mock).mockRejectedValue(new Error('SafeMessage not found'))
+
+    // Mock message not found
+    server.use(
+      http.get(`${GATEWAY_URL}/v1/chains/:chainId/messages/:messageHash`, () => {
+        return HttpResponse.error()
+      }),
+    )
 
     const proposalSpy = jest
       .spyOn(sender, 'dispatchSafeMsgProposal')
       .mockImplementation(() => Promise.reject(new Error('Test error')))
 
-    const { getByText } = render(
+    const { getByText } = renderWithSafeShield(
       <SignMessage
         logoUri="www.fake.com/test.png"
         name="Test App"
@@ -526,11 +559,11 @@ describe('SignMessage', () => {
           value: zeroPadValue('0x01', 20),
         },
         chainId: '5',
-      } as SafeInfo,
+      } as SafeState,
       messageText,
     )
     const msg = {
-      type: SafeMessageListItemType.MESSAGE,
+      type: 'MESSAGE',
       messageHash,
       confirmations: [
         {
@@ -541,12 +574,20 @@ describe('SignMessage', () => {
       ],
       confirmationsRequired: 2,
       confirmationsSubmitted: 1,
-    } as unknown as SafeMessage
-    ;(getSafeMessage as jest.Mock).mockResolvedValue(msg)
+    } as unknown as MessageItem
+
+    // Mock getSafeMessage response
+    server.use(
+      http.get(`${GATEWAY_URL}/v1/chains/:chainId/messages/:messageHash`, () => {
+        const msgWithoutType = { ...msg }
+        delete (msgWithoutType as any).type
+        return HttpResponse.json(msgWithoutType as Message)
+      }),
+    )
 
     jest.spyOn(useSafeMessage, 'default').mockReturnValue([msg, jest.fn(), undefined])
 
-    const { getByText } = render(
+    const { getByText } = renderWithSafeShield(
       <SignMessage logoUri="www.fake.com/test.png" name="Test App" message={messageText} requestId="123" />,
     )
 
@@ -590,11 +631,11 @@ describe('SignMessage', () => {
           value: zeroPadValue('0x01', 20),
         },
         chainId: '5',
-      } as SafeInfo,
+      } as SafeState,
       messageText,
     )
     const msg = {
-      type: SafeMessageListItemType.MESSAGE,
+      type: 'MESSAGE',
       messageHash,
       confirmations: [
         {
@@ -611,12 +652,20 @@ describe('SignMessage', () => {
       confirmationsRequired: 2,
       confirmationsSubmitted: 2,
       preparedSignature: '0x678',
-    } as unknown as SafeMessage
+    } as unknown as MessageItem
 
     jest.spyOn(useSafeMessage, 'default').mockReturnValue([msg, jest.fn(), undefined])
-    ;(getSafeMessage as jest.Mock).mockResolvedValue(msg)
 
-    const { getByText } = render(
+    // Mock getSafeMessage response
+    server.use(
+      http.get(`${GATEWAY_URL}/v1/chains/:chainId/messages/:messageHash`, () => {
+        const msgWithoutType = { ...msg }
+        delete (msgWithoutType as any).type
+        return HttpResponse.json(msgWithoutType as Message)
+      }),
+    )
+
+    const { getByText } = renderWithSafeShield(
       <SignMessage logoUri="www.fake.com/test.png" name="Test App" message={messageText} requestId="123" />,
     )
 

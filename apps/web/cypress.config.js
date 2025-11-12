@@ -2,7 +2,7 @@ import { defineConfig } from 'cypress'
 import 'dotenv/config'
 import * as fs from 'fs'
 import { configureVisualRegression } from 'cypress-visual-regression'
-import { version } from './src/markdown/terms/version.ts'
+import { version } from './src/markdown/terms/version.js'
 
 export default defineConfig({
   projectId: 'exhdra',
@@ -17,17 +17,18 @@ export default defineConfig({
   },
   e2e: {
     screenshotsFolder: './cypress/snapshots/actual',
+    viewportWidth: 1280,
+    viewportHeight: 800,
     setupNodeEvents(on, config) {
       // Set Cookie term version on the cypress env - this way we can access it in the tests
       config.env.CURRENT_COOKIE_TERMS_VERSION = version
-
-      configureVisualRegression(on),
+      ;(configureVisualRegression(on),
         on('task', {
           log(message) {
             console.log(message)
             return null
           },
-        })
+        }))
 
       on('after:spec', (spec, results) => {
         if (results && results.video) {

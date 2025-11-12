@@ -1,45 +1,66 @@
 import { LoadingScreen } from '@/src/components/LoadingScreen'
-import React, { useCallback, useLayoutEffect } from 'react'
-import { useDefinedActiveSafe } from '@/src/store/hooks/activeSafe'
-import { useAppSelector } from '@/src/store/hooks'
-import { selectChainById } from '@/src/store/chains'
-import { RootState } from '@/src/store'
-import type { ChainInfo } from '@safe-global/safe-gateway-typescript-sdk'
+import React, { useEffect } from 'react'
 import { useLocalSearchParams } from 'expo-router'
-import { useLazySignTransactionQuery } from '@/src/store/signersBalance'
-import { getPrivateKey } from '@/src/hooks/useSign/useSign'
 import SignError from './SignError'
 import SignSuccess from './SignSuccess'
+import { useTransactionGuard } from '@/src/hooks/useTransactionGuard'
+import { SigningStatus, useTransactionSigning } from './hooks/useTransactionSigning'
+import { useAppSelector } from '@/src/store/hooks'
+import { selectActiveSigner } from '@/src/store/activeSignerSlice'
+import { useDefinedActiveSafe } from '@/src/store/hooks/activeSafe'
 
 export function SignTransaction() {
-  const { txId, signerAddress } = useLocalSearchParams<{ txId: string; signerAddress: string }>()
+  const { txId } = useLocalSearchParams<{ txId: string }>()
   const activeSafe = useDefinedActiveSafe()
-  const activeChain = useAppSelector((state: RootState) => selectChainById(state, activeSafe.chainId))
+  const activeSigner = useAppSelector((state) => selectActiveSigner(state, activeSafe.address))
+  const { guard: canSign } = useTransactionGuard('signing')
+  const { status, executeSign, retry, isApiLoading, isApiError } = useTransactionSigning({
+    txId: txId || '',
+    signerAddress: activeSigner?.value || '',
+  })
 
-  const [trigger, { isFetching, data, isError }] = useLazySignTransactionQuery()
+  // Auto-sign when component mounts if user can sign
+  useEffect(() => {
+    if (canSign && status === SigningStatus.IDLE && txId && activeSigner) {
+      executeSign()
+    }
+  }, [canSign, status, executeSign, txId, activeSigner])
 
-  const sign = useCallback(async () => {
-    const privateKey = await getPrivateKey(signerAddress)
-
-    trigger({
-      chain: activeChain as ChainInfo,
-      activeSafe,
-      txId,
-      privateKey,
-    })
-  }, [activeChain, activeSafe, txId, signerAddress])
-
-  useLayoutEffect(() => {
-    sign()
-  }, [sign])
-
-  if (isError) {
-    return <SignError onRetryPress={sign} />
+  // Handle early returns after all hooks are called
+  if (!txId) {
+    const handleRetry = () => {
+      console.error('Cannot retry: missing transaction ID')
+    }
+    return <SignError description="Missing transaction ID" onRetryPress={handleRetry} />
   }
 
-  if (isFetching || !data) {
+  if (!activeSigner) {
+    const handleRetry = () => {
+      console.error('Cannot retry: no active signer')
+    }
+    return <SignError description="No signer selected" onRetryPress={handleRetry} />
+  }
+
+  // Handle API errors
+  if (isApiError) {
+    return <SignError onRetryPress={retry} description="Failed to submit transaction confirmation" />
+  }
+
+  // Handle signing errors
+  if (status === SigningStatus.ERROR) {
+    return <SignError onRetryPress={retry} description="There was an error signing the transaction." />
+  }
+
+  // Handle success
+  if (status === SigningStatus.SUCCESS) {
+    return <SignSuccess />
+  }
+
+  // Show loading state
+  if (status === SigningStatus.LOADING || isApiLoading) {
     return <LoadingScreen title="Signing transaction..." description="It may take a few seconds..." />
   }
 
-  return <SignSuccess />
+  // This should rarely be reached (idle state while authorized)
+  return <LoadingScreen title="Preparing to sign..." description="Initializing signing process..." />
 }

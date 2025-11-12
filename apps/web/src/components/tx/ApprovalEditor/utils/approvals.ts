@@ -1,13 +1,14 @@
-import { ERC20__factory } from '@/types/contracts'
-import { UNLIMITED_APPROVAL_AMOUNT } from '@/utils/tokens'
+import type { DataDecoded, DataDecodedParameter } from '@safe-global/store/gateway/AUTO_GENERATED/data-decoded'
 import type { BaseTransaction } from '@safe-global/safe-apps-sdk'
-import type { DecodedDataResponse } from '@safe-global/safe-gateway-typescript-sdk'
-import { parseUnits, id } from 'ethers'
+import { parseUnits } from 'ethers'
 import { EMPTY_DATA } from '@safe-global/protocol-kit/dist/src/utils/constants'
 import { type ApprovalInfo } from '../hooks/useApprovalInfos'
-
-export const APPROVAL_SIGNATURE_HASH = id('approve(address,uint256)').slice(0, 10)
-export const INCREASE_ALLOWANCE_SIGNATURE_HASH = id('increaseAllowance(address,uint256)').slice(0, 10)
+import { UNLIMITED_APPROVAL_AMOUNT } from '@safe-global/utils/utils/tokens'
+import {
+  APPROVAL_SIGNATURE_HASH,
+  ERC20_INTERFACE,
+  INCREASE_ALLOWANCE_SIGNATURE_HASH,
+} from '@safe-global/utils/components/tx/ApprovalEditor/utils/approvals'
 
 const MULTISEND_METHOD = 'multiSend'
 
@@ -17,8 +18,6 @@ const TRANSACTIONS_PARAM = 'transactions'
 
 const ADDRESS_TYPE = 'address'
 const UINT256_TYPE = 'uint256'
-
-const ERC20_INTERFACE = ERC20__factory.createInterface()
 
 export enum PSEUDO_APPROVAL_VALUES {
   UNLIMITED = 'Unlimited amount',
@@ -32,20 +31,28 @@ const parseApprovalAmount = (amount: string, decimals: number) => {
   return parseUnits(amount, decimals)
 }
 
-export const extractTxs: (txs: BaseTransaction[] | (DecodedDataResponse & { to: string })) => BaseTransaction[] = (
-  txs,
-) => {
+function hasMultiSendParameters(
+  txs: DataDecoded & { to: string },
+): txs is DataDecoded & { to: string; parameters: DataDecodedParameter[] } {
+  return txs.method === MULTISEND_METHOD && txs.parameters?.length === 1
+}
+
+function hasApproveCallParameters(
+  txs: DataDecoded & { to: string },
+): txs is DataDecoded & { to: string; parameters: DataDecodedParameter[] } {
+  return txs.method === APPROVE_METHOD && txs.parameters?.length === 2
+}
+
+export const extractTxs: (txs: BaseTransaction[] | (DataDecoded & { to: string })) => BaseTransaction[] = (txs) => {
   if (Array.isArray(txs)) {
     return txs
   }
 
-  const isMultiSendCall = txs.method === MULTISEND_METHOD && txs.parameters.length === 1
-
   // Our multisend contract takes 1 param called transactions
-  if (isMultiSendCall) {
+  if (hasMultiSendParameters(txs)) {
     const txParam = txs.parameters[0]
     if (txParam.name === TRANSACTIONS_PARAM) {
-      return txParam.valueDecoded
+      return txParam.valueDecoded && Array.isArray(txParam.valueDecoded)
         ? txParam.valueDecoded.map((innerTx) => ({
             to: innerTx.to,
             data: innerTx.data || EMPTY_DATA,
@@ -55,9 +62,7 @@ export const extractTxs: (txs: BaseTransaction[] | (DecodedDataResponse & { to: 
     }
   }
 
-  const isApproveCall = txs.method === APPROVE_METHOD && txs.parameters.length === 2
-
-  if (isApproveCall) {
+  if (hasApproveCallParameters(txs)) {
     const spenderParam = txs.parameters[0]
     const amountParam = txs.parameters[1]
 

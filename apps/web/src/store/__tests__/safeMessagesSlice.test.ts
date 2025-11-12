@@ -1,6 +1,5 @@
+import type { MessageItem, DateLabel } from '@safe-global/store/gateway/AUTO_GENERATED/messages'
 import { createListenerMiddleware } from '@reduxjs/toolkit'
-import { SafeMessageListItemType } from '@safe-global/safe-gateway-typescript-sdk'
-import type { SafeMessage, SafeMessageDateLabel } from '@safe-global/safe-gateway-typescript-sdk'
 
 import * as safeMsgEvents from '@/services/safe-messages/safeMsgEvents'
 import { safeMessagesListener, safeMessagesSlice } from '../safeMessagesSlice'
@@ -33,12 +32,13 @@ describe('safeMessagesSlice', () => {
       }
 
       const message = {
-        type: SafeMessageListItemType.MESSAGE,
+        type: 'MESSAGE',
         messageHash: '0x123',
-      } as SafeMessage
+      } as MessageItem
 
       const action = safeMessagesSlice.actions.set({
         loading: false,
+        loaded: true,
         data: {
           results: [message],
         },
@@ -65,6 +65,7 @@ describe('safeMessagesSlice', () => {
 
       const action = safeMessagesSlice.actions.set({
         loading: false,
+        loaded: true,
         data: undefined, // Cleared
       })
 
@@ -85,13 +86,14 @@ describe('safeMessagesSlice', () => {
         dispatch: jest.fn(),
       }
 
-      const dateLabel: SafeMessageDateLabel = {
-        type: SafeMessageListItemType.DATE_LABEL,
+      const dateLabel: DateLabel = {
+        type: 'DATE_LABEL' as const,
         timestamp: 0,
       }
 
       const action = safeMessagesSlice.actions.set({
         loading: false,
+        loaded: true,
         data: {
           results: [dateLabel],
         },
@@ -115,12 +117,13 @@ describe('safeMessagesSlice', () => {
       }
 
       const message = {
-        type: SafeMessageListItemType.MESSAGE,
+        type: 'MESSAGE',
         messageHash: '0x456',
-      } as SafeMessage
+      } as MessageItem
 
       const action = safeMessagesSlice.actions.set({
         loading: false,
+        loaded: true,
         data: {
           results: [message],
         },

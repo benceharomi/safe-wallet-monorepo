@@ -28,16 +28,14 @@ export const SignersContainer = () => {
       <View flex={1}>
         <SignersList
           isFetching={isFetching}
-          hasLocalSingers={!!group.imported?.data.length}
+          hasLocalSigners={!!group.imported?.data.length}
           signersGroup={signersSections}
         />
       </View>
 
-      <View paddingHorizontal={'$3'}>
-        <SafeButton onPress={onImportSigner} testID={'import-signer-button'}>
-          Import signer
-        </SafeButton>
-      </View>
+      <SafeButton onPress={onImportSigner} testID={'import-signer-button'}>
+        Import signer
+      </SafeButton>
     </View>
   )
 }

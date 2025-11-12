@@ -5,8 +5,6 @@ import {
   type ThunkAction,
   type Action,
   type Middleware,
-  type EnhancedStore,
-  type ThunkDispatch,
 } from '@reduxjs/toolkit'
 import { useDispatch, useSelector, type TypedUseSelectorHook } from 'react-redux'
 import merge from 'lodash/merge'
@@ -21,6 +19,7 @@ import {
   swapOrderStatusListener,
   txHistoryListener,
   txQueueListener,
+  authListener,
 } from './slices'
 import * as slices from './slices'
 import * as hydrate from './useHydrateStore'
@@ -29,6 +28,8 @@ import { safePassApi } from './api/safePass'
 import { version as termsVersion } from '@/markdown/terms/version'
 import { cgwClient, setBaseUrl } from '@safe-global/store/gateway/cgwClient'
 import { GATEWAY_URL } from '@/config/gateway'
+import { setupListeners } from '@reduxjs/toolkit/query'
+import { migrateBatchTxs } from '@/services/ls-migration/batch'
 
 const rootReducer = combineReducers({
   [slices.chainsSlice.name]: slices.chainsSlice.reducer,
@@ -58,6 +59,7 @@ const rootReducer = combineReducers({
   [safePassApi.reducerPath]: safePassApi.reducer,
   [slices.gatewayApi.reducerPath]: slices.gatewayApi.reducer,
   [cgwClient.reducerPath]: cgwClient.reducer,
+  [slices.authSlice.reducerPath]: slices.authSlice.reducer,
 })
 
 const persistedSlices: (keyof Partial<RootState>)[] = [
@@ -75,6 +77,7 @@ const persistedSlices: (keyof Partial<RootState>)[] = [
   slices.swapOrderSlice.name,
   slices.visitedSafesSlice.name,
   slices.orderByPreferenceSlice.name,
+  slices.authSlice.name,
 ]
 
 export const getPersistedState = () => {
@@ -92,7 +95,14 @@ const middleware: Middleware<{}, RootState>[] = [
   slices.gatewayApi.middleware,
 ]
 
-const listeners = [safeMessagesListener, txHistoryListener, txQueueListener, swapOrderListener, swapOrderStatusListener]
+const listeners = [
+  safeMessagesListener,
+  txHistoryListener,
+  txQueueListener,
+  swapOrderListener,
+  swapOrderStatusListener,
+  authListener,
+]
 
 export const _hydrationReducer: typeof rootReducer = (state, action) => {
   if (action.type === hydrate.HYDRATE_ACTION) {
@@ -114,6 +124,11 @@ export const _hydrationReducer: typeof rootReducer = (state, action) => {
       }
     }
 
+    // Migrate batchSlice txDetails to txData
+    if (nextState[slices.batchSlice.name]) {
+      nextState[slices.batchSlice.name] = migrateBatchTxs(nextState[slices.batchSlice.name])
+    }
+
     return nextState
   }
   return rootReducer(state, action) as RootState
@@ -122,10 +137,7 @@ export const _hydrationReducer: typeof rootReducer = (state, action) => {
 type MakeStoreOptions = {
   skipBroadcast?: boolean
 }
-export const makeStore = (
-  initialState?: Partial<RootState>,
-  options?: MakeStoreOptions,
-): EnhancedStore<RootState, Action> => {
+export const makeStore = (initialState?: Partial<RootState>, options?: MakeStoreOptions) => {
   setBaseUrl(GATEWAY_URL)
 
   const store = configureStore({
@@ -142,14 +154,32 @@ export const makeStore = (
     listenToBroadcast(store)
   }
 
+  setupListeners(store.dispatch)
+
   return store
 }
 
 export type RootState = ReturnType<typeof rootReducer>
-export type AppDispatch = ThunkDispatch<RootState, unknown, Action> & EnhancedStore<RootState, Action>['dispatch']
+export type AppStore = ReturnType<typeof makeStore>
+export type AppDispatch = AppStore['dispatch']
 export type AppThunk<ReturnType = void> = ThunkAction<ReturnType, RootState, unknown, Action>
 
 export const useAppDispatch = () => useDispatch<AppDispatch>()
 export const useAppSelector: TypedUseSelectorHook<RootState> = useSelector
 
 export const useHydrateStore = hydrate.useHydrateStore
+
+// Store instance for imperative usage outside of React components
+// This is initialized in _app.tsx and should be used for non-component contexts
+let _store: ReturnType<typeof makeStore> | null = null
+
+export const setStoreInstance = (store: ReturnType<typeof makeStore>) => {
+  _store = store
+}
+
+export const getStoreInstance = () => {
+  if (!_store) {
+    throw new Error('Store not initialized. Ensure _app.tsx has called setStoreInstance.')
+  }
+  return _store
+}

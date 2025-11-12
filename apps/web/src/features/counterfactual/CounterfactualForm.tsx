@@ -1,7 +1,7 @@
 import { TxModalContext } from '@/components/tx-flow'
 import useDeployGasLimit from '@/features/counterfactual/hooks/useDeployGasLimit'
 import { deploySafeAndExecuteTx } from '@/features/counterfactual/utils'
-import { getTotalFeeFormatted } from '@/hooks/useGasPrice'
+
 import useSafeInfo from '@/hooks/useSafeInfo'
 import useWalletCanPay from '@/hooks/useWalletCanPay'
 import useWallet from '@/hooks/wallets/useWallet'
@@ -19,15 +19,15 @@ import { getTxOptions } from '@/utils/transactions'
 import CheckWallet from '@/components/common/CheckWallet'
 import { useIsExecutionLoop } from '@/components/tx/SignOrExecuteForm/hooks'
 import type { SignOrExecuteProps } from '@/components/tx/SignOrExecuteForm/SignOrExecuteForm'
-import type { SafeTransaction } from '@safe-global/safe-core-sdk-types'
+import type { SafeTransaction } from '@safe-global/types-kit'
 import AdvancedParams, { useAdvancedParams } from '@/components/tx/AdvancedParams'
-import { asError } from '@/services/exceptions/utils'
+import { asError } from '@safe-global/utils/services/exceptions/utils'
 
-import css from '@/components/tx/SignOrExecuteForm/styles.module.css'
 import commonCss from '@/components/tx-flow/common/styles.module.css'
-import { TxSecurityContext } from '@/components/tx/security/shared/TxSecurityContext'
 import useIsSafeOwner from '@/hooks/useIsSafeOwner'
 import NonOwnerError from '@/components/tx/SignOrExecuteForm/NonOwnerError'
+import { getTotalFeeFormatted } from '@safe-global/utils/hooks/useDefaultGasPrice'
+import { useSafeShield } from '../safe-shield/SafeShieldContext'
 
 export const CounterfactualForm = ({
   safeTx,
@@ -41,7 +41,7 @@ export const CounterfactualForm = ({
 }: SignOrExecuteProps & {
   isOwner: ReturnType<typeof useIsSafeOwner>
   isExecutionLoop: ReturnType<typeof useIsExecutionLoop>
-  txSecurity: ReturnType<typeof useTxSecurityContext>
+  txSecurity: ReturnType<typeof useSafeShield>
   safeTx?: SafeTransaction
   isCreation?: boolean
 }): ReactElement => {
@@ -55,7 +55,7 @@ export const CounterfactualForm = ({
 
   // Hooks
   const currentChain = useCurrentChain()
-  const { needsRiskConfirmation, isRiskConfirmed, setIsRiskIgnored } = txSecurity
+  const { needsRiskConfirmation, isRiskConfirmed } = txSecurity
   const { setTxFlow } = useContext(TxModalContext)
 
   // Estimate gas limit
@@ -66,11 +66,6 @@ export const CounterfactualForm = ({
   const handleSubmit = async (e: SyntheticEvent) => {
     e.preventDefault()
     onSubmit?.(Math.random().toString())
-
-    if (needsRiskConfirmation && !isRiskConfirmed) {
-      setIsRiskIgnored(true)
-      return
-    }
 
     setIsSubmittable(false)
     setSubmitError(undefined)
@@ -134,7 +129,7 @@ export const CounterfactualForm = ({
           </ul>
         </Alert>
 
-        <div className={classNames(css.params)}>
+        <div className={classNames(commonCss.params)}>
           <AdvancedParams
             willExecute
             params={advancedParams}
@@ -186,10 +181,8 @@ export const CounterfactualForm = ({
   )
 }
 
-const useTxSecurityContext = () => useContext(TxSecurityContext)
-
 export default madProps(CounterfactualForm, {
   isOwner: useIsSafeOwner,
   isExecutionLoop: useIsExecutionLoop,
-  txSecurity: useTxSecurityContext,
+  txSecurity: useSafeShield,
 })

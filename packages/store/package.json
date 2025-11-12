@@ -2,6 +2,7 @@
   "private": true,
   "name": "@safe-global/store",
   "version": "1.0.0",
+  "main": "./src/index.ts",
   "scripts": {
     "test": "jest",
     "fetch-schema": "ts-node ./scripts/fetch-schema.ts > scripts/api-schema/schema.json",
@@ -15,6 +16,7 @@
     "jest": "^29.7.0"
   },
   "dependencies": {
+    "redux-persist": "^6.0.0",
     "ts-node": "^10.9.2"
   }
 }

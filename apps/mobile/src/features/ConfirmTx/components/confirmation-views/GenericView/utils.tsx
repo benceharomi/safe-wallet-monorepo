@@ -4,15 +4,17 @@ import { Logo } from '@/src/components/Logo'
 import { Badge } from '@/src/components/Badge'
 import { ellipsis } from '@/src/utils/formatters'
 import { CircleProps, Text, View } from 'tamagui'
-import { shortenAddress } from '@safe-global/utils/formatters'
+import { shortenAddress } from '@safe-global/utils/utils/formatters'
 import { Chain } from '@safe-global/store/gateway/AUTO_GENERATED/chains'
 import {
   MultisigExecutionDetails,
-  SettingsChangeTransaction,
   TransactionData,
+  TransactionDetails,
 } from '@safe-global/store/gateway/AUTO_GENERATED/transactions'
 import { Identicon } from '@/src/components/Identicon'
 import { Address } from '@/src/types/address'
+import { CopyButton } from '@/src/components/CopyButton'
+import { TouchableOpacity } from 'react-native'
 
 const mintBadgeProps: CircleProps = { borderRadius: '$2', paddingHorizontal: '$2', paddingVertical: '$1' }
 
@@ -21,11 +23,13 @@ export const formatGenericViewItems = ({
   txData,
   chain,
   executionInfo,
+  viewOnExplorer,
 }: {
-  txInfo: SettingsChangeTransaction
+  txInfo: TransactionDetails['txInfo']
   txData: TransactionData
   chain: Chain
   executionInfo: MultisigExecutionDetails
+  viewOnExplorer: () => void
 }) => {
   const genericViewName = txData.to.name ? ellipsis(txData.to.name, 18) : shortenAddress(txData.to.value)
 
@@ -36,7 +40,8 @@ export const formatGenericViewItems = ({
         <Badge
           circleProps={mintBadgeProps}
           themeName="badge_background"
-          fontSize={12}
+          fontSize={13}
+          textContentProps={{ fontFamily: 'DM Mono' }}
           circular={false}
           content={txData.dataDecoded?.method ?? ''}
         />
@@ -52,16 +57,20 @@ export const formatGenericViewItems = ({
             <Identicon address={txData.to.value as Address} size={24} />
           )}
           <Text fontSize="$4">{genericViewName}</Text>
-          <SafeFontIcon name="copy" size={14} color="textSecondaryLight" />
-          <SafeFontIcon name="external-link" size={14} color="textSecondaryLight" />
+          <CopyButton value={txData.to.value} color={'$textSecondaryLight'} />
+
+          <TouchableOpacity onPress={viewOnExplorer}>
+            <SafeFontIcon name="external-link" size={14} color="$textSecondaryLight" />
+          </TouchableOpacity>
         </View>
       ),
     },
   ]
 
-  if (txInfo.settingsInfo?.type === 'CHANGE_THRESHOLD') {
+  // Only show settings-specific UI for SettingsChangeTransaction
+  if ('settingsInfo' in txInfo && txInfo.settingsInfo?.type === 'CHANGE_THRESHOLD') {
     items.push({
-      label: 'Token',
+      label: 'Threshold',
       render: () => (
         <View flexDirection="row" alignItems="center" gap="$2">
           {txInfo.settingsInfo && 'threshold' in txInfo.settingsInfo && (

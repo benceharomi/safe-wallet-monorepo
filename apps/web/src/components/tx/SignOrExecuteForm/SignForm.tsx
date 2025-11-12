@@ -1,25 +1,39 @@
 import madProps from '@/utils/mad-props'
-import { type ReactElement, type SyntheticEvent, useContext, useMemo, useState } from 'react'
-import { CircularProgress, Box, Button, CardActions, Divider } from '@mui/material'
-import Stack from '@mui/system/Stack'
+import { type ReactElement, type ReactNode, type SyntheticEvent, useContext, useMemo, useState } from 'react'
+import { CircularProgress, Box, Button, Divider, Tooltip } from '@mui/material'
 import ErrorMessage from '@/components/tx/ErrorMessage'
 import { trackError, Errors } from '@/services/exceptions'
 import useIsSafeOwner from '@/hooks/useIsSafeOwner'
 import CheckWallet from '@/components/common/CheckWallet'
 import { useAlreadySigned, useTxActions } from './hooks'
-import type { SignOrExecuteProps } from './SignOrExecuteForm'
-import type { SafeTransaction } from '@safe-global/safe-core-sdk-types'
+import type { SafeTransaction } from '@safe-global/types-kit'
 import { TxModalContext } from '@/components/tx-flow'
 import commonCss from '@/components/tx-flow/common/styles.module.css'
-import { TxSecurityContext } from '../security/shared/TxSecurityContext'
 import NonOwnerError from '@/components/tx/SignOrExecuteForm/NonOwnerError'
 import WalletRejectionError from '@/components/tx/SignOrExecuteForm/WalletRejectionError'
-import BatchButton from './BatchButton'
-import { asError } from '@/services/exceptions/utils'
+import BatchButton from '@/components/tx-flow/actions/Batching/BatchButton'
+import { asError } from '@safe-global/utils/services/exceptions/utils'
 import { isWalletRejection } from '@/utils/wallets'
 import { useSigner } from '@/hooks/wallets/useWallet'
 import { NestedTxSuccessScreenFlow } from '@/components/tx-flow/flows'
 import { useValidateTxData } from '@/hooks/useValidateTxData'
+import { TxCardActions } from '@/components/tx-flow/common/TxCard'
+import { useSafeShield } from '@/features/safe-shield/SafeShieldContext'
+
+type SubmitCallback = (txId: string, isExecuted?: boolean) => void
+
+export type SignFormProps = {
+  txId?: string
+  onSubmit?: SubmitCallback
+  children?: ReactNode
+  isExecutable?: boolean
+  isRejection?: boolean
+  isBatch?: boolean
+  isBatchable?: boolean
+  onlyExecute?: boolean
+  disableSubmit?: boolean
+  origin?: string
+}
 
 export const SignForm = ({
   safeTx,
@@ -33,12 +47,14 @@ export const SignForm = ({
   isOwner,
   txActions,
   txSecurity,
-}: SignOrExecuteProps & {
+  tooltip,
+}: SignFormProps & {
   isOwner: ReturnType<typeof useIsSafeOwner>
   txActions: ReturnType<typeof useTxActions>
-  txSecurity: ReturnType<typeof useTxSecurityContext>
+  txSecurity: ReturnType<typeof useSafeShield>
   isCreation?: boolean
   safeTx?: SafeTransaction
+  tooltip?: string
 }): ReactElement => {
   // Form state
   const [isSubmittable, setIsSubmittable] = useState<boolean>(true)
@@ -54,18 +70,13 @@ export const SignForm = ({
   // Hooks
   const { signTx, addToBatch } = txActions
   const { setTxFlow } = useContext(TxModalContext)
-  const { needsRiskConfirmation, isRiskConfirmed, setIsRiskIgnored } = txSecurity
+  const { needsRiskConfirmation, isRiskConfirmed } = txSecurity
   const hasSigned = useAlreadySigned(safeTx)
   const signer = useSigner()
 
   // On modal submit
   const handleSubmit = async (e: SyntheticEvent, isAddingToBatch = false) => {
     e.preventDefault()
-
-    if (needsRiskConfirmation && !isRiskConfirmed) {
-      setIsRiskIgnored(true)
-      return
-    }
 
     if (!safeTx || validationError) return
 
@@ -122,7 +133,9 @@ export const SignForm = ({
         <NonOwnerError />
       ) : (
         submitError && (
-          <ErrorMessage error={submitError}>Error submitting the transaction. Please try again.</ErrorMessage>
+          <ErrorMessage error={submitError} context="execution">
+            Error submitting the transaction. Please try again.
+          </ErrorMessage>
         )
       )}
 
@@ -138,47 +151,41 @@ export const SignForm = ({
 
       <Divider className={commonCss.nestedDivider} sx={{ pt: 3 }} />
 
-      <CardActions>
-        <Stack
-          sx={{
-            width: ['100%', '100%', '100%', 'auto'],
-          }}
-          direction={{ xs: 'column-reverse', lg: 'row' }}
-          spacing={{ xs: 2, md: 2 }}
-        >
-          {/* Batch button */}
-          {isCreation && !isBatch && (
-            <BatchButton
-              onClick={onBatchClick}
-              disabled={submitDisabled || !isBatchable}
-              tooltip={!isBatchable ? `Cannot batch this type of transaction` : undefined}
-            />
-          )}
+      <TxCardActions>
+        {/* Batch button */}
+        {isCreation && !isBatch && (
+          <BatchButton
+            onClick={onBatchClick}
+            disabled={submitDisabled || !isBatchable}
+            tooltip={!isBatchable ? `Cannot batch this type of transaction` : undefined}
+          />
+        )}
 
-          {/* Submit button */}
-          <CheckWallet checkNetwork={!submitDisabled}>
-            {(isOk) => (
-              <Button
-                data-testid="sign-btn"
-                variant="contained"
-                type="submit"
-                disabled={!isOk || submitDisabled}
-                sx={{ minWidth: '82px', order: '1', width: ['100%', '100%', '100%', 'auto'] }}
-              >
-                {!isSubmittable ? <CircularProgress size={20} /> : 'Sign'}
-              </Button>
-            )}
-          </CheckWallet>
-        </Stack>
-      </CardActions>
+        {/* Submit button */}
+        <CheckWallet checkNetwork={!submitDisabled}>
+          {(isOk) => (
+            <Tooltip title={tooltip} placement="top">
+              <span>
+                <Button
+                  data-testid="sign-btn"
+                  variant="contained"
+                  type="submit"
+                  disabled={!isOk || submitDisabled}
+                  sx={{ minWidth: '82px', order: '1', width: ['100%', '100%', '100%', 'auto'] }}
+                >
+                  {!isSubmittable ? <CircularProgress size={20} /> : 'Sign'}
+                </Button>
+              </span>
+            </Tooltip>
+          )}
+        </CheckWallet>
+      </TxCardActions>
     </form>
   )
 }
 
-const useTxSecurityContext = () => useContext(TxSecurityContext)
-
 export default madProps(SignForm, {
   isOwner: useIsSafeOwner,
   txActions: useTxActions,
-  txSecurity: useTxSecurityContext,
+  txSecurity: useSafeShield,
 })

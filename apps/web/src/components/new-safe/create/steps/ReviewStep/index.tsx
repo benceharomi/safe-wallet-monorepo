@@ -2,11 +2,10 @@ import type { NamedAddress } from '@/components/new-safe/create/types'
 import EthHashInfo from '@/components/common/EthHashInfo'
 import { safeCreationDispatch, SafeCreationEvent } from '@/features/counterfactual/services/safeCreationEvents'
 import NetworkLogosList from '@/features/multichain/components/NetworkLogosList'
-import { getTotalFeeFormatted } from '@/hooks/useGasPrice'
+
 import type { StepRenderProps } from '@/components/new-safe/CardStepper/useCardStepper'
 import type { NewSafeFormData } from '@/components/new-safe/create'
 import {
-  computeNewSafeAddress,
   createNewSafe,
   createNewUndeployedSafeWithoutSalt,
   relaySafeCreation,
@@ -19,7 +18,7 @@ import useSyncSafeCreationStep from '@/components/new-safe/create/useSyncSafeCre
 import ReviewRow from '@/components/new-safe/ReviewRow'
 import ErrorMessage from '@/components/tx/ErrorMessage'
 import { ExecutionMethod, ExecutionMethodSelector } from '@/components/tx/ExecutionMethodSelector'
-import PayNowPayLater, { PayMethod } from '@/features/counterfactual/PayNowPayLater'
+import PayNowPayLater from '@/features/counterfactual/PayNowPayLater'
 import { CF_TX_GROUP_KEY, replayCounterfactualSafeDeployment } from '@/features/counterfactual/utils'
 import { useCurrentChain, useHasFeature } from '@/hooks/useChains'
 import useGasPrice from '@/hooks/useGasPrice'
@@ -27,16 +26,21 @@ import useIsWrongChain from '@/hooks/useIsWrongChain'
 import { useLeastRemainingRelays } from '@/hooks/useRemainingRelays'
 import useWalletCanPay from '@/hooks/useWalletCanPay'
 import useWallet from '@/hooks/wallets/useWallet'
-import { CREATE_SAFE_CATEGORY, CREATE_SAFE_EVENTS, OVERVIEW_EVENTS, trackEvent } from '@/services/analytics'
+import {
+  CREATE_SAFE_CATEGORY,
+  CREATE_SAFE_EVENTS,
+  OVERVIEW_EVENTS,
+  trackEvent,
+  MixpanelEventParams,
+} from '@/services/analytics'
 import { gtmSetChainId, gtmSetSafeAddress } from '@/services/analytics/gtm'
-import { asError } from '@/services/exceptions/utils'
+import { asError } from '@safe-global/utils/services/exceptions/utils'
 import { useAppDispatch, useAppSelector } from '@/store'
-import { FEATURES, hasFeature } from '@/utils/chains'
 import { hasRemainingRelays } from '@/utils/relaying'
 import { isWalletRejection } from '@/utils/wallets'
 import ArrowBackIcon from '@mui/icons-material/ArrowBack'
 import { Box, Button, CircularProgress, Divider, Grid, Tooltip, Typography } from '@mui/material'
-import { type ChainInfo } from '@safe-global/safe-gateway-typescript-sdk'
+import { type Chain } from '@safe-global/store/gateway/AUTO_GENERATED/chains'
 import classnames from 'classnames'
 import { useRouter } from 'next/router'
 import { useMemo, useState } from 'react'
@@ -46,12 +50,14 @@ import useAllSafes from '@/features/myAccounts/hooks/useAllSafes'
 import uniq from 'lodash/uniq'
 import { selectRpc } from '@/store/settingsSlice'
 import { AppRoutes } from '@/config/routes'
-import { type ReplayedSafeProps } from '@/store/slices'
+import { type ReplayedSafeProps } from '@safe-global/utils/features/counterfactual/store/types'
 import { predictAddressBasedOnReplayData } from '@/features/multichain/utils/utils'
-import { createWeb3ReadOnly, getRpcServiceUrl } from '@/hooks/wallets/web3'
-import { type DeploySafeProps } from '@safe-global/protocol-kit'
+import { createWeb3ReadOnly } from '@/hooks/wallets/web3'
 import { updateAddressBook } from '../../logic/address-book'
-import chains from '@/config/chains'
+import { FEATURES, hasFeature } from '@safe-global/utils/utils/chains'
+import { PayMethod } from '@safe-global/utils/features/counterfactual/types'
+import { type TransactionOptions } from '@safe-global/types-kit'
+import { getTotalFeeFormatted } from '@safe-global/utils/hooks/useDefaultGasPrice'
 
 export const NetworkFee = ({
   totalFee,
@@ -60,7 +66,7 @@ export const NetworkFee = ({
   inline = false,
 }: {
   totalFee: string
-  chain: ChainInfo | undefined
+  chain: Chain | undefined
   isWaived: boolean
   inline?: boolean
 }) => {
@@ -84,7 +90,7 @@ export const SafeSetupOverview = ({
   name?: string
   owners: NamedAddress[]
   threshold: number
-  networks: ChainInfo[]
+  networks: Chain[]
 }) => {
   return (
     <Grid container spacing={3}>
@@ -238,21 +244,7 @@ const ReviewStep = ({ data, onSubmit, onBack, setStep }: StepRenderProps<NewSafe
       const provider = createWeb3ReadOnly(chain, customRpcUrl)
       if (!provider) return
 
-      let safeAddress: string
-
-      if (chain.chainId === chains['zksync']) {
-        safeAddress = await computeNewSafeAddress(
-          customRpcUrl || getRpcServiceUrl(chain.rpcUri),
-          {
-            safeAccountConfig: replayedSafeWithNonce.safeAccountConfig,
-            saltNonce: nextAvailableNonce,
-          },
-          chain,
-          replayedSafeWithNonce.safeVersion,
-        )
-      } else {
-        safeAddress = await predictAddressBasedOnReplayData(replayedSafeWithNonce, provider)
-      }
+      const safeAddress = await predictAddressBasedOnReplayData(replayedSafeWithNonce, provider)
 
       for (const network of data.networks) {
         await createSafe(network, replayedSafeWithNonce, safeAddress)
@@ -290,10 +282,26 @@ const ReviewStep = ({ data, onSubmit, onBack, setStep }: StepRenderProps<NewSafe
     }
   }
 
-  const createSafe = async (chain: ChainInfo, props: ReplayedSafeProps, safeAddress: string) => {
+  const createSafe = async (chain: Chain, props: ReplayedSafeProps, safeAddress: string) => {
     if (!wallet) return
 
     gtmSetChainId(chain.chainId)
+
+    trackEvent(CREATE_SAFE_EVENTS.CREATED_SAFE, {
+      [MixpanelEventParams.SAFE_ADDRESS]: safeAddress,
+      [MixpanelEventParams.BLOCKCHAIN_NETWORK]: chain.chainName,
+      [MixpanelEventParams.NUMBER_OF_OWNERS]: props.safeAccountConfig.owners.length,
+      [MixpanelEventParams.THRESHOLD]: props.safeAccountConfig.threshold,
+      [MixpanelEventParams.ENTRY_POINT]: document.referrer || 'Direct',
+      [MixpanelEventParams.DEPLOYMENT_TYPE]:
+        isCounterfactualEnabled && payMethod === PayMethod.PayLater ? 'Counterfactual' : 'Direct',
+      [MixpanelEventParams.PAYMENT_METHOD]:
+        isCounterfactualEnabled && payMethod === PayMethod.PayLater
+          ? 'Pay-later'
+          : willRelay
+            ? 'Sponsored'
+            : 'Self-paid',
+    })
 
     try {
       if (isCounterfactualEnabled && payMethod === PayMethod.PayLater) {
@@ -301,11 +309,11 @@ const ReviewStep = ({ data, onSubmit, onBack, setStep }: StepRenderProps<NewSafe
 
         trackEvent({ ...OVERVIEW_EVENTS.PROCEED_WITH_TX, label: 'counterfactual', category: CREATE_SAFE_CATEGORY })
         replayCounterfactualSafeDeployment(chain.chainId, safeAddress, props, data.name, dispatch, payMethod)
-        trackEvent({ ...CREATE_SAFE_EVENTS.CREATED_SAFE, label: 'counterfactual' })
+
         return
       }
 
-      const options: DeploySafeProps['options'] = isEIP1559
+      const options: TransactionOptions = isEIP1559
         ? {
             maxFeePerGas: maxFeePerGas?.toString(),
             maxPriorityFeePerGas: maxPriorityFeePerGas?.toString(),
@@ -342,7 +350,6 @@ const ReviewStep = ({ data, onSubmit, onBack, setStep }: StepRenderProps<NewSafe
         await createNewSafe(
           wallet.provider,
           props,
-          data.safeVersion,
           chain,
           options,
           (txHash) => {

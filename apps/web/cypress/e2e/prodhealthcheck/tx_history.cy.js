@@ -88,12 +88,7 @@ describe('[PROD] Tx history tests 1', () => {
   it('Verify exapanded details for initial spending limits setup', () => {
     createTx.clickOnTransactionItemByName(typeSpendingLimits.title, typeSpendingLimits.summaryTxInfo)
     createTx.verifyExpandedDetails(
-      [
-        typeSpendingLimits.contractTitle,
-        typeSpendingLimits.call_multiSend,
-        typeSpendingLimits.transactionHash,
-        typeSpendingLimits.safeTxHash,
-      ],
+      [typeSpendingLimits.contractTitle, typeSpendingLimits.call_multiSend, typeSpendingLimits.transactionHash],
       createTx.delegateCallWarning,
     )
   })
@@ -115,16 +110,18 @@ describe('[PROD] Tx history tests 1', () => {
       typeDeleteAllowance.beneficiary,
       typeDeleteAllowance.beneficiaryAddress,
       typeDeleteAllowance.transactionHash,
-      typeDeleteAllowance.safeTxHash,
       typeDeleteAllowance.token,
       typeDeleteAllowance.tokenName,
     ])
   })
 
-  // Unskip when advanced details PR is merged to main
-  it.skip('Verify advanced details displayed in exapanded details for allowance deletion', () => {
+  it('Verify advanced details displayed in exapanded details for allowance deletion', () => {
     createTx.clickOnTransactionItemByName(typeDeleteAllowance.title, typeDeleteAllowance.summaryTxInfo)
-    createTx.expandAdvancedDetails([typeDeleteAllowance.baseGas])
+    createTx.expandAdvancedDetails([
+      typeDeleteAllowance.baseGas,
+      typeDeleteAllowance.operation,
+      typeDeleteAllowance.zero_call,
+    ])
     createTx.collapseAdvancedDetails([typeDeleteAllowance.baseGas])
   })
 })

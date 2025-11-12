@@ -94,7 +94,7 @@ export function verifyMandatoryTokensExist() {
 
 export function selectToken(token) {
   clickOnTokenDropdown()
-  cy.get(tokenItem).contains(token).click()
+  cy.get(tokenItem).contains(token).click({ force: true })
   main.verifyValuesExist(tokenBalance, [token])
 }
 
@@ -185,7 +185,7 @@ export function enterSpendingLimitAmount(amount) {
 }
 
 export function enterBeneficiaryAddress(address) {
-  getBeneficiaryInput().clear().type(address)
+  getBeneficiaryInput().clear({ force: true }).type(address, { force: true })
 }
 
 export function checkBeneficiaryInputValue(value) {

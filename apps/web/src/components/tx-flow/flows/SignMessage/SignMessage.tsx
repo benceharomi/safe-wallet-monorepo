@@ -1,3 +1,4 @@
+import type { MessageItem } from '@safe-global/store/gateway/AUTO_GENERATED/messages'
 import {
   Grid,
   Button,
@@ -14,9 +15,7 @@ import {
 import { useTheme } from '@mui/material/styles'
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
 import { useContext, useEffect } from 'react'
-import { SafeMessageListItemType, SafeMessageStatus } from '@safe-global/safe-gateway-typescript-sdk'
 import type { ReactElement } from 'react'
-import type { SafeMessage } from '@safe-global/safe-gateway-typescript-sdk'
 import type { RequestId } from '@safe-global/safe-apps-sdk'
 import EthHashInfo from '@/components/common/EthHashInfo'
 import RequiredIcon from '@/public/images/messages/required.svg'
@@ -42,8 +41,7 @@ import { trackEvent } from '@/services/analytics'
 import { TX_EVENTS, TX_TYPES } from '@/services/analytics/events/transactions'
 import { SafeTxContext } from '../../SafeTxProvider'
 import RiskConfirmationError from '@/components/tx/SignOrExecuteForm/RiskConfirmationError'
-import { TxSecurityContext } from '@/components/tx/security/shared/TxSecurityContext'
-import { isBlindSigningPayload, isEIP712TypedData } from '@/utils/safe-messages'
+import { isBlindSigningPayload, isEIP712TypedData } from '@safe-global/utils/utils/safe-messages'
 import ApprovalEditor from '@/components/tx/ApprovalEditor'
 import { ErrorBoundary } from '@sentry/react'
 import { isWalletRejection } from '@/utils/wallets'
@@ -54,13 +52,14 @@ import { AppRoutes } from '@/config/routes'
 import { useRouter } from 'next/router'
 import MsgShareLink from '@/components/safe-messages/MsgShareLink'
 import LinkIcon from '@/public/images/messages/link.svg'
-import { Blockaid } from '@/components/tx/security/blockaid'
 import CheckWallet from '@/components/common/CheckWallet'
 import NetworkWarning from '@/components/new-safe/create/NetworkWarning'
-import { getDomainHash, getSafeMessageMessageHash } from '@/utils/safe-hashes'
-import type { SafeVersion } from '@safe-global/safe-core-sdk-types'
+import { getDomainHash, getSafeMessageMessageHash } from '@safe-global/utils/utils/safe-hashes'
+import type { SafeVersion } from '@safe-global/types-kit'
+import { useSafeShield } from '@/features/safe-shield/SafeShieldContext'
+import { RiskConfirmation } from '../../features/RiskConfirmation'
 
-const createSkeletonMessage = (confirmationsRequired: number): SafeMessage => {
+const createSkeletonMessage = (confirmationsRequired: number): MessageItem => {
   return {
     confirmations: [],
     confirmationsRequired,
@@ -74,8 +73,8 @@ const createSkeletonMessage = (confirmationsRequired: number): SafeMessage => {
     proposedBy: {
       value: '',
     },
-    status: SafeMessageStatus.NEEDS_CONFIRMATION,
-    type: SafeMessageListItemType.MESSAGE,
+    status: 'NEEDS_CONFIRMATION',
+    type: 'MESSAGE',
   }
 }
 
@@ -220,7 +219,7 @@ const BlindSigningWarning = ({
   )
 }
 
-const SuccessCard = ({ safeMessage, onContinue }: { safeMessage: SafeMessage; onContinue: () => void }) => {
+const SuccessCard = ({ safeMessage, onContinue }: { safeMessage: MessageItem; onContinue: () => void }) => {
   return (
     <TxCard>
       <Typography
@@ -242,7 +241,7 @@ const SuccessCard = ({ safeMessage, onContinue }: { safeMessage: SafeMessage; on
   )
 }
 
-type BaseProps = Pick<SafeMessage, 'logoUri' | 'name' | 'message'>
+type BaseProps = Pick<MessageItem, 'logoUri' | 'name' | 'message'>
 
 export type SignMessageProps = BaseProps & {
   origin?: string
@@ -253,7 +252,7 @@ const SignMessage = ({ message, origin, requestId }: SignMessageProps): ReactEle
   // Hooks & variables
   const { setTxFlow } = useContext(TxModalContext)
   const { setSafeMessage: setContextSafeMessage } = useContext(SafeTxContext)
-  const { needsRiskConfirmation, isRiskConfirmed, setIsRiskIgnored } = useContext(TxSecurityContext)
+  const { needsRiskConfirmation, isRiskConfirmed } = useSafeShield()
   const { palette } = useTheme()
   const { safe } = useSafeInfo()
   const isOwner = useIsSafeOwner()
@@ -277,7 +276,11 @@ const SignMessage = ({ message, origin, requestId }: SignMessageProps): ReactEle
   const isBlindSigningRequest = isBlindSigningPayload(decodedMessage)
   const isBlindSigningEnabled = useAppSelector(selectBlindSigning)
   const isDisabled =
-    !isOwner || signedByCurrentSafe || !safe.deployed || (!isBlindSigningEnabled && isBlindSigningRequest)
+    !isOwner ||
+    signedByCurrentSafe ||
+    !safe.deployed ||
+    (!isBlindSigningEnabled && isBlindSigningRequest) ||
+    (needsRiskConfirmation && !isRiskConfirmed)
 
   const { onSign, submitError } = useSyncSafeMessageSigner(
     safeMessage,
@@ -289,11 +292,6 @@ const SignMessage = ({ message, origin, requestId }: SignMessageProps): ReactEle
   )
 
   const handleSign = async () => {
-    if (needsRiskConfirmation && !isRiskConfirmed) {
-      setIsRiskIgnored(true)
-      return
-    }
-
     const updatedMessage = await onSign()
 
     if (updatedMessage) {
@@ -360,7 +358,7 @@ const SignMessage = ({ message, origin, requestId }: SignMessageProps): ReactEle
           </Accordion>
 
           <Box sx={{ '&:not(:empty)': { mt: 2 } }}>
-            <Blockaid />
+            <RiskConfirmation />
           </Box>
         </CardContent>
       </TxCard>

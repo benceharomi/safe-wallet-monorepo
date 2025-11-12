@@ -11,11 +11,12 @@ const customJestConfig = {
   moduleNameMapper: {
     // Handle module aliases (this will be automatically configured for you soon)
     '^@/(.*)$': '<rootDir>/src/$1',
-    '^react$': '<rootDir>/node_modules/react',
-    '^react-dom$': '<rootDir>/node_modules/react-dom',
+    '^react-dom$': '<rootDir>/../../node_modules/react-dom',
+    '^react-dom/client$': '<rootDir>/../../node_modules/react-dom/client',
     '^.+\\.(svg)$': '<rootDir>/mocks/svg.js',
     '^.+/markdown/terms/terms\\.md$': '<rootDir>/mocks/terms.md.js',
     isows: '<rootDir>/node_modules/isows/_cjs/index.js',
+    '^@safe-global/utils/(.*)$': '<rootDir>/../../packages/utils/src/$1',
   },
   // https://github.com/mswjs/jest-fixed-jsdom
   // without this environment it is basically impossible to run tests with msw
