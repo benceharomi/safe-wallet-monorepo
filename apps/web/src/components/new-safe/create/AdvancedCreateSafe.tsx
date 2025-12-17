@@ -35,7 +35,6 @@ const AdvancedCreateSafe = () => {
       subtitle: 'Select the network on which to create your Safe Account',
       render: (data, onSubmit, onBack, setStep) => (
         <SetNameStep
-          isAdvancedFlow
           setSafeName={setSafeName}
           data={data}
           onSubmit={onSubmit}

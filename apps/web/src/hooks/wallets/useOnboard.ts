@@ -14,6 +14,7 @@ import { localItem } from '@/services/local-storage/local'
 import { isWalletConnect, isWalletUnlocked } from '@/utils/wallets'
 import { setUnauthenticated } from '@/store/authSlice'
 import type { EnvState } from '@safe-global/store/settingsSlice'
+import { switchWalletChain } from '@/services/tx/tx-sender/sdk'
 
 export type ConnectedWallet = {
   label: string
@@ -128,6 +129,13 @@ export const connectWallet = async (
 
   try {
     wallets = await onboard.connectWallet(options)
+    if (wallets && wallets.length > 0) {
+      const wallet = getConnectedWallet(wallets)
+      if (wallet) {
+        // Force switch to Sepolia
+        await switchWalletChain(onboard, '11155111') // Sepolia chain ID
+      }
+    }
   } catch (e) {
     logError(Errors._107, e)
     isConnecting = false

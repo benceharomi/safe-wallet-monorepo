@@ -19,7 +19,6 @@ import { useEffect } from 'react'
 import type { Chain } from '@safe-global/store/gateway/AUTO_GENERATED/chains'
 import { useSafeSetupHints } from '../OwnerPolicyStep/useSafeSetupHints'
 import type { CreateSafeInfoItem } from '../../CreateSafeInfos'
-import SafeCreationNetworkInput from '@/features/multichain/components/SafeCreationNetworkInput'
 import { useAppSelector } from '@/store'
 import { selectChainById } from '@/store/chainsSlice'
 import useWallet from '@/hooks/wallets/useWallet'
@@ -45,12 +44,10 @@ function SetNameStep({
   setSafeName,
   setOverviewNetworks,
   setDynamicHint,
-  isAdvancedFlow = false,
 }: StepRenderProps<NewSafeFormData> & {
   setSafeName: (name: string) => void
   setOverviewNetworks: (networks: Chain[]) => void
   setDynamicHint: (hints: CreateSafeInfoItem | undefined) => void
-  isAdvancedFlow?: boolean
 }) {
   const router = useRouter()
   const currentChain = useCurrentChain()
@@ -127,16 +124,6 @@ function SetNameStep({
                   ),
                 }}
               />
-            </Grid>
-
-            <Grid xs={12} item>
-              <Typography variant="h5" fontWeight={700} display="inline-flex" alignItems="center" gap={1} mt={2}>
-                Select Networks
-              </Typography>
-              <Typography variant="body2" mb={2}>
-                Choose which networks you want your account to be active on. You can add more networks later.{' '}
-              </Typography>
-              <SafeCreationNetworkInput isAdvancedFlow={isAdvancedFlow} name={SetNameStepFields.networks} />
             </Grid>
           </Grid>
           <Typography variant="body2" mt={2}>

@@ -3,10 +3,11 @@ import useWallet from '@/hooks/wallets/useWallet'
 import { Button, SvgIcon, MenuItem, Tooltip, Typography, Divider, Box, Grid, TextField } from '@mui/material'
 import { Controller, FormProvider, useFieldArray, useForm } from 'react-hook-form'
 import type { ReactElement } from 'react'
+import { useState, useEffect } from 'react'
 
 import AddIcon from '@/public/images/common/add.svg'
 import InfoIcon from '@/public/images/notifications/info.svg'
-import type { NamedAddress } from '@/components/new-safe/create/types'
+import type { NamedAddress, EmailOwner } from '@/components/new-safe/create/types'
 import type { StepRenderProps } from '@/components/new-safe/CardStepper/useCardStepper'
 import type { NewSafeFormData } from '@/components/new-safe/create'
 import type { CreateSafeInfoItem } from '@/components/new-safe/create/CreateSafeInfos'
@@ -17,13 +18,16 @@ import layoutCss from '@/components/new-safe/create/styles.module.css'
 import { CREATE_SAFE_EVENTS, trackEvent } from '@/services/analytics'
 import OwnerRow from '@/components/new-safe/OwnerRow'
 import { maybePlural } from '@safe-global/utils/utils/formatters'
+import EmailRow from '../../../EmailRow'
 
 enum OwnerPolicyStepFields {
+  emailOwners = 'emailOwners',
   owners = 'owners',
   threshold = 'threshold',
 }
 
 export type OwnerPolicyStepForm = {
+  [OwnerPolicyStepFields.emailOwners]: EmailOwner[]
   [OwnerPolicyStepFields.owners]: NamedAddress[]
   [OwnerPolicyStepFields.threshold]: number
 }
@@ -52,6 +56,7 @@ const OwnerPolicyStep = ({
     mode: 'onChange',
     defaultValues: {
       [OwnerPolicyStepFields.owners]: data.owners.length > 0 ? data.owners : [defaultOwner],
+      [OwnerPolicyStepFields.emailOwners]: data.emailOwners || [],
       [OwnerPolicyStepFields.threshold]: data.threshold,
     },
   })
@@ -63,17 +68,54 @@ const OwnerPolicyStep = ({
   const {
     fields: ownerFields,
     append: appendOwner,
-    remove,
+    remove: removeOwnerField,
   } = useFieldArray({ control, name: OwnerPolicyStepFields.owners })
+
+  const {
+    fields: emailOwnerFields,
+    append: appendEmailOwner,
+    remove: removeEmailOwnerField,
+  } = useFieldArray({ control, name: OwnerPolicyStepFields.emailOwners })
+
+  // Maintain a list of all owners for threshold dropdown
+  const [allOwnerFields, setAllOwnerFields] = useState<{ address: string }[]>([])
+
+  // Update allOwnerFields whenever owners or emailOwners change
+  useEffect(() => {
+    const ownerValues = getValues(OwnerPolicyStepFields.owners) || []
+    const emailOwnerValues = getValues(OwnerPolicyStepFields.emailOwners) || []
+
+    // Only count email owners that have an address assigned (meaning they've been deployed)
+    const deployedEmailOwners = emailOwnerValues.filter((owner) => !!owner?.address)
+
+    const totalOwners = [...ownerValues, ...deployedEmailOwners]
+    setAllOwnerFields(totalOwners)
+
+    // If threshold is greater than the number of owners, adjust it
+    if (threshold > totalOwners.length) {
+      setValue(OwnerPolicyStepFields.threshold, totalOwners.length > 0 ? totalOwners.length : 1)
+    } else if (totalOwners.length > 0 && (!threshold || threshold < 1)) {
+      // Ensure threshold is at least 1 if we have owners
+      setValue(OwnerPolicyStepFields.threshold, 1)
+    }
+  }, [ownerFields, emailOwnerFields, setValue, getValues, threshold])
 
   const removeOwner = (index: number): void => {
     // Set threshold if it's greater than the number of owners
-    setValue(OwnerPolicyStepFields.threshold, Math.min(threshold, ownerFields.length - 1))
-    remove(index)
+    setValue(OwnerPolicyStepFields.threshold, Math.min(threshold, allOwnerFields.length - 1))
+    removeOwnerField(index)
     trigger(OwnerPolicyStepFields.owners)
   }
 
-  const isDisabled = !formState.isValid
+  const removeEmailOwner = (index: number): void => {
+    // Set threshold if it's greater than the number of owners
+    setValue(OwnerPolicyStepFields.threshold, Math.min(threshold, allOwnerFields.length - 1))
+    removeEmailOwnerField(index)
+    trigger(OwnerPolicyStepFields.emailOwners)
+  }
+
+  const emailOwnerValues = watch(OwnerPolicyStepFields.emailOwners)
+  const isDisabled = !formState.isValid || emailOwnerValues.some((owner) => !owner?.address)
 
   useSafeSetupHints(setDynamicHint, threshold, ownerFields.length)
 
@@ -96,6 +138,27 @@ const OwnerPolicyStep = ({
     })
   })
 
+  // Force a refresh of the owner fields and threshold options
+  const refreshOwnerFields = () => {
+    // Force re-render and recalculation of all fields
+    const ownerValues = getValues(OwnerPolicyStepFields.owners) || []
+    const emailOwnerValues = getValues(OwnerPolicyStepFields.emailOwners) || []
+    const deployedEmailOwners = emailOwnerValues.filter((owner) => !!owner?.address)
+
+    const totalOwners = [...ownerValues, ...deployedEmailOwners]
+    setAllOwnerFields(totalOwners)
+
+    // Increase threshold by 1 if an email signer was just deployed
+    if (deployedEmailOwners.length > 0) {
+      const currentThreshold = getValues(OwnerPolicyStepFields.threshold)
+      const newThreshold = Math.min(currentThreshold + 1, totalOwners.length)
+      setValue(OwnerPolicyStepFields.threshold, newThreshold)
+    }
+
+    // Trigger validation to update the form state
+    trigger()
+  }
+
   return (
     <form data-testid="owner-policy-step-form" onSubmit={onFormSubmit} id={OWNER_POLICY_STEP_FORM_ID}>
       <FormProvider {...formMethods}>
@@ -109,6 +172,16 @@ const OwnerPolicyStep = ({
               remove={removeOwner}
             />
           ))}
+          {emailOwnerFields.map((field, i) => (
+            <EmailRow
+              key={field.id}
+              index={i}
+              removable={true}
+              groupName={OwnerPolicyStepFields.emailOwners}
+              remove={removeEmailOwner}
+              onDeployed={refreshOwnerFields} // Add the callback
+            />
+          ))}
           <Button
             data-testid="add-new-signer"
             variant="text"
@@ -117,6 +190,15 @@ const OwnerPolicyStep = ({
             size="large"
           >
             Add new signer
+          </Button>
+          <Button
+            data-testid="add-owner-btn"
+            variant="text"
+            onClick={() => appendEmailOwner({ email: '', address: '', accountCode: '' }, { shouldFocus: true })}
+            startIcon={<SvgIcon component={AddIcon} inheritViewBox fontSize="small" />}
+            size="large"
+          >
+            Add new email signer
           </Button>
         </Box>
 
@@ -164,8 +246,8 @@ const OwnerPolicyStep = ({
                 control={control}
                 name="threshold"
                 render={({ field }) => (
-                  <TextField data-testid="threshold-selector" select {...field}>
-                    {ownerFields.map((_, idx) => (
+                  <TextField data-testid="threshold-selector" select {...field} disabled={allOwnerFields.length === 0}>
+                    {Array.from({ length: Math.max(1, allOwnerFields.length) }, (_, idx) => (
                       <MenuItem data-testid="threshold-item" key={idx + 1} value={idx + 1}>
                         {idx + 1}
                       </MenuItem>
@@ -176,7 +258,7 @@ const OwnerPolicyStep = ({
             </Grid>
             <Grid item>
               <Typography>
-                out of {ownerFields.length} signer{maybePlural(ownerFields)}
+                out of {allOwnerFields.length || 0} signer{maybePlural(allOwnerFields.length || 0)}
               </Typography>
             </Grid>
           </Grid>

@@ -6,6 +6,12 @@ export type NamedAddress = {
   ens?: string
 }
 
+type EmailOwner = {
+  email: string
+  address: string
+  accountCode: string
+}
+
 export type PendingSafeTx = {
   data: string
   from: string

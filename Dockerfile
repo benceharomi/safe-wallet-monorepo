@@ -18,13 +18,24 @@ RUN yarn config set httpTimeout 300000
 RUN yarn install --immutable
 RUN yarn after-install
 
+ARG PORT
+ARG NEXT_PUBLIC_SNS_BACKEND_URL
+ARG NEXT_PUBLIC_INFURA_TOKEN
+ARG NEXT_PUBLIC_WC_PROJECT_ID
+
 # Set environment variables
-ENV NODE_ENV production
-ENV NEXT_TELEMETRY_DISABLED 1
-ENV PORT 3000
+ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV PORT=3000
+ENV NEXT_PUBLIC_SNS_BACKEND_URL=$NEXT_PUBLIC_SNS_BACKEND_URL
+ENV NEXT_PUBLIC_INFURA_TOKEN=$NEXT_PUBLIC_INFURA_TOKEN
+ENV NEXT_PUBLIC_WC_PROJECT_ID=$NEXT_PUBLIC_WC_PROJECT_ID
+
+# Build the static site
+RUN yarn build
 
 # Expose the port
 EXPOSE 3000
 
-# Command to start the application
-CMD ["yarn", "static-serve"]
+# Serve the static files
+CMD ["sh", "-c", "npx -y serve out -p ${PORT:-3000}"]

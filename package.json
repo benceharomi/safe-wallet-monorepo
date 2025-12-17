@@ -25,6 +25,7 @@
     "stylus": "github:stylus/stylus#0.64.0"
   },
   "devDependencies": {
+    "@types/circomlibjs": "^0.1.6",
     "husky": "^9.1.6",
     "lint-staged": "^15.2.10",
     "msw": "^2.7.3",
@@ -40,6 +41,7 @@
   },
   "packageManager": "yarn@4.6.0",
   "dependencies": {
-    "@yarnpkg/types": "^4.0.1"
+    "@yarnpkg/types": "^4.0.1",
+    "circomlibjs": "^0.1.7"
   }
 }
