@@ -2,8 +2,8 @@ name: Web Happy path on demand tests
 
 on:
   workflow_dispatch:
-  schedule:
-    - cron: '0 4 * * 3'
+  # schedule:
+  #   - cron: '0 4 * * 3'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
